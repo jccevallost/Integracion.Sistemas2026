@@ -31,19 +31,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Remove dev dependencies
-        run: npm prune --omit=dev
-
-      - name: Package node_modules for Oryx (Linux binary)
+      - name: Package node_modules for Oryx (Linux binary, before prune)
         run: cd node_modules && tar -czf ../node_modules.tar.gz . && cd ..
+
+      - name: Remove dev dependencies from dir (tar.gz already saved)
+        run: npm prune --omit=dev
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: Sistema_vuelos.v1/vuelos-backend
-          exclude: |
-            node_modules
 
   deploy:
     runs-on: ubuntu-latest
