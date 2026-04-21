@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { ApiSuccess, BoardingPass } from '../models/domain';
 
-const BASE = 'http://localhost:3000/api/v1';
+const BASE = 'http://https://integracion-sistemas2026.onrender.com/api/v1';
 
 export interface CreateBoardingPassPayload {
   passengerId: string; segmentId: string; boardingCode: string;
