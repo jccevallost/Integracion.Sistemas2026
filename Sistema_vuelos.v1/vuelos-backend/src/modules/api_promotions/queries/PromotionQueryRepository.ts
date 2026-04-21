@@ -1,5 +1,5 @@
 // infrastructure/queries/PromotionQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class PromotionQueryRepository {
   constructor(private readonly db: PrismaClient) {}

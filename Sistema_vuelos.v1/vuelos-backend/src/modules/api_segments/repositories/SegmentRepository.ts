@@ -1,5 +1,5 @@
 // infrastructure/repositories/SegmentRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { ISegmentRepository } from '../interfaces/ISegmentRepository.js';
 import { Segment } from '../entities/Segment.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

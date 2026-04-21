@@ -1,5 +1,5 @@
 // infrastructure/repositories/BoardingPassRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IBoardingPassRepository } from '../interfaces/IBoardingPassRepository.js';
 import { BoardingPass } from '../entities/BoardingPass.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

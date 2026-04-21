@@ -1,5 +1,5 @@
 // infrastructure/repositories/AircraftRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IAircraftRepository } from '../interfaces/IAircraftRepository.js';
 import { Aircraft } from '../entities/Aircraft.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

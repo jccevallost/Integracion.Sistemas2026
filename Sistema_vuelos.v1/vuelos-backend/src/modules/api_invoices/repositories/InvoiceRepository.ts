@@ -1,5 +1,5 @@
 // infrastructure/repositories/InvoiceRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IInvoiceRepository } from '../interfaces/IInvoiceRepository.js';
 import { Invoice } from '../entities/Invoice.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

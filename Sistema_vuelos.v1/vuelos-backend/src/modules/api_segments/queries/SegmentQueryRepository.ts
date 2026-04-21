@@ -1,5 +1,5 @@
 // infrastructure/queries/SegmentQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class SegmentQueryRepository {
   constructor(private readonly db: PrismaClient) {}

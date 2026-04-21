@@ -1,5 +1,5 @@
 // infrastructure/queries/UserQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class UserQueryRepository {
   constructor(private readonly db: PrismaClient) {}

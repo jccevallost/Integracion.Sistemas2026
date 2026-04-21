@@ -1,5 +1,5 @@
 // infrastructure/repositories/CountryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { ICountryRepository } from '../interfaces/ICountryRepository.js';
 import { Country } from '../entities/Country.js';
 import { CountryMapper } from '../mappers/CountryMapper.js';

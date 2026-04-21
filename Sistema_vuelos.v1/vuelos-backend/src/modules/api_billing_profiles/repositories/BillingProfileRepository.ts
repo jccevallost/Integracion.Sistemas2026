@@ -1,5 +1,5 @@
 // infrastructure/repositories/BillingProfileRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IBillingProfileRepository } from '../interfaces/IBillingProfileRepository.js';
 import { BillingProfile } from '../entities/BillingProfile.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

@@ -1,5 +1,5 @@
 // infrastructure/repositories/ServiceCatalogRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IServiceCatalogRepository } from '../interfaces/IServiceCatalogRepository.js';
 import { ServiceCatalog } from '../entities/ServiceCatalog.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

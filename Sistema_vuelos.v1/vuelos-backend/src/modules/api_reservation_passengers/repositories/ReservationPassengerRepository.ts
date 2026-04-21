@@ -1,5 +1,5 @@
 // infrastructure/repositories/ReservationPassengerRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IReservationPassengerRepository } from '../interfaces/IReservationPassengerRepository.js';
 import { ReservationPassenger } from '../entities/ReservationPassenger.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

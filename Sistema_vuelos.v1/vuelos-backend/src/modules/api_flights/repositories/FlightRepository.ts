@@ -1,5 +1,5 @@
 // infrastructure/repositories/FlightRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IFlightRepository, FlightSearchParams } from '../interfaces/IFlightRepository.js';
 import { Flight } from '../entities/Flight.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

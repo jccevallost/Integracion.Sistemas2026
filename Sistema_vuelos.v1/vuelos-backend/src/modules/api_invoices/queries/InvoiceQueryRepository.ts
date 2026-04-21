@@ -1,5 +1,5 @@
 // infrastructure/queries/InvoiceQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class InvoiceQueryRepository {
   constructor(private readonly db: PrismaClient) {}

@@ -1,5 +1,5 @@
 // infrastructure/queries/AuditLogQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class AuditLogQueryRepository {
   constructor(private readonly db: PrismaClient) {}

@@ -1,5 +1,5 @@
 // infrastructure/repositories/PaymentRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IPaymentRepository } from '../interfaces/IPaymentRepository.js';
 import { Payment } from '../entities/Payment.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

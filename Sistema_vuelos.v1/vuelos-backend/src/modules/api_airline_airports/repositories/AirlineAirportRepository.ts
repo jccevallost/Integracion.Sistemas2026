@@ -1,5 +1,5 @@
 // infrastructure/repositories/AirlineAirportRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IAirlineAirportRepository } from '../interfaces/IAirlineAirportRepository.js';
 import { AirlineAirport } from '../entities/AirlineAirport.js';
 

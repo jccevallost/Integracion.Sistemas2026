@@ -1,6 +1,6 @@
 // infrastructure/queries/FlightQueryRepository.ts
 // Queries complejas de vuelos separadas del repositorio principal (CQRS lite)
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class FlightQueryRepository {
   constructor(private readonly db: PrismaClient) {}

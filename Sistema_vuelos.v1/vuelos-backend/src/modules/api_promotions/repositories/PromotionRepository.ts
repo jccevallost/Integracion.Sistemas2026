@@ -1,5 +1,5 @@
 // infrastructure/repositories/PromotionRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IPromotionRepository } from '../interfaces/IPromotionRepository.js';
 import { Promotion } from '../entities/Promotion.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

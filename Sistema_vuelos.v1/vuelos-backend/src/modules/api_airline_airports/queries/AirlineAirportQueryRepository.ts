@@ -1,5 +1,5 @@
 // infrastructure/queries/AirlineAirportQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class AirlineAirportQueryRepository {
   constructor(private readonly db: PrismaClient) {}

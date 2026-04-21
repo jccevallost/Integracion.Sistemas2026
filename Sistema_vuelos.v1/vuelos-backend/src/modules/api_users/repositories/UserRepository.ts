@@ -1,5 +1,5 @@
 // infrastructure/repositories/UserRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IUserRepository } from '../interfaces/IUserRepository.js';
 import { User } from '../entities/User.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

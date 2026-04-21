@@ -1,5 +1,5 @@
 // infrastructure/repositories/CityRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { ICityRepository } from '../interfaces/ICityRepository.js';
 import { City } from '../entities/City.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

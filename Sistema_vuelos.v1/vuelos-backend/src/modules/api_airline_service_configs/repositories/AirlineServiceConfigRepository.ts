@@ -1,5 +1,5 @@
 // infrastructure/repositories/AirlineServiceConfigRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IAirlineServiceConfigRepository } from '../interfaces/IAirlineServiceConfigRepository.js';
 import { AirlineServiceConfig } from '../entities/AirlineServiceConfig.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

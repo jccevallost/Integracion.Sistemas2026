@@ -1,5 +1,5 @@
 // infrastructure/queries/PaymentQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class PaymentQueryRepository {
   constructor(private readonly db: PrismaClient) {}

@@ -1,5 +1,5 @@
 // infrastructure/queries/BoardingPassQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class BoardingPassQueryRepository {
   constructor(private readonly db: PrismaClient) {}

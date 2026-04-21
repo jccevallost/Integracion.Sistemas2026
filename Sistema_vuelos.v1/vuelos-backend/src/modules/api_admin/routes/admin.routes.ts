@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/AdminController.js';
 import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 // Repositorios genéricos usados directamente para CRUD simple de catálogos
 function makeGenericRouter(db: PrismaClient, model: any, include?: object): Router {

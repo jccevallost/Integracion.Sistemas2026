@@ -1,5 +1,5 @@
 // infrastructure/queries/ReservationPassengerQueryRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 export class ReservationPassengerQueryRepository {
   constructor(private readonly db: PrismaClient) {}

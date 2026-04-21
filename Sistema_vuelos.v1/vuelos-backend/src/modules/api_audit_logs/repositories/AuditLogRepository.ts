@@ -1,5 +1,5 @@
 // infrastructure/repositories/AuditLogRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IAuditLogRepository } from '../interfaces/IAuditLogRepository.js';
 import { AuditLog } from '../entities/AuditLog.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';

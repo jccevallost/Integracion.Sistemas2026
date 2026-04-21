@@ -1,5 +1,5 @@
 // infrastructure/repositories/PassengerServiceRepository.ts
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { IPassengerServiceRepository } from '../interfaces/IPassengerServiceRepository.js';
 import { PassengerService } from '../entities/PassengerService.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';
