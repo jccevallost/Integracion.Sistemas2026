@@ -1,0 +1,383 @@
+import { Component, inject, signal, OnInit } from '@angular/core';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { ReservationsService } from '../../../core/services/reservations.service';
+import { BoardingPassesService } from '../../../core/services/boarding-passes.service';
+import { PassengerServicesService } from '../../../core/services/passenger-services.service';
+import { AirlineServiceConfigsService } from '../../../core/services/airline-service-configs.service';
+import type { Reservation, Passenger, BoardingPass, PassengerService, AirlineServiceConfig } from '../../../core/models/domain';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+const STATUS_STYLES: Record<string, string> = {
+  CONFIRMED: 'bg-green-100 text-green-700', PENDING: 'bg-yellow-100 text-yellow-700',
+  CANCELLED: 'bg-red-100 text-red-700',    COMPLETED: 'bg-gray-100 text-gray-600',
+};
+const STATUS_LABELS: Record<string, string> = {
+  CONFIRMED: 'Confirmada', PENDING: 'Pendiente', CANCELLED: 'Cancelada', COMPLETED: 'Completada',
+};
+const CHECKIN_LABELS: Record<string, { label: string; color: string }> = {
+  NOT_CHECKED_IN: { label: 'Sin check-in',  color: 'text-gray-500 bg-gray-100' },
+  CHECKED_IN:     { label: 'Check-in OK',   color: 'text-green-700 bg-green-100' },
+  BOARDED:        { label: 'Embarcado',     color: 'text-blue-700 bg-blue-100' },
+  NO_SHOW:        { label: 'No se presentó',color: 'text-red-700 bg-red-100' },
+};
+const SERVICE_CAT_LABELS: Record<string, string> = {
+  BAGGAGE: 'Equipaje', SEAT: 'Asiento', MEAL: 'Comida',
+  ENTERTAINMENT: 'Entretenimiento', LOUNGE: 'Sala VIP',
+  INSURANCE: 'Seguro', TRANSPORT: 'Transporte', OTRO: 'Otro',
+};
+
+function generateBoardingCode(passengerId: string) {
+  return `BP-${passengerId.slice(0, 4).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+interface PassengerState {
+  passenger: Passenger;
+  expanded: boolean;
+  boardingPasses: BoardingPass[];
+  passengerServices: PassengerService[];
+  checkingIn: boolean;
+  addingService: boolean;
+  selectedConfig: string;
+  loadingBP: boolean;
+  loadingServices: boolean;
+}
+
+@Component({
+  selector: 'app-reservation-detail',
+  standalone: true,
+  imports: [CommonModule, RouterModule],
+  template: `
+    <div class="max-w-2xl mx-auto px-4 py-8 space-y-5">
+      <button (click)="router.navigate(['/my-trips'])" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+        ← Mis viajes
+      </button>
+
+      <div *ngIf="loading()" class="flex justify-center py-32">
+        <svg class="w-7 h-7 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      </div>
+
+      <ng-container *ngIf="!loading() && reservation() as r">
+        <!-- Header -->
+        <div class="flex items-start justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Reserva #{{ r.reservationCode }}</h1>
+            <p class="text-sm text-gray-400 mt-0.5">Creada el {{ createdDate(r) }}</p>
+          </div>
+          <span [class]="'text-sm font-medium px-3 py-1 rounded-full ' + statusStyle(r.status)">{{ statusLabel(r.status) }}</span>
+        </div>
+
+        <!-- Vuelo -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="flex items-center gap-2 mb-4">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            <p class="font-semibold text-gray-800">{{ r.flight?.airline?.name ?? 'Aerolínea' }}</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <div>
+              <p class="text-3xl font-bold text-gray-900">{{ depTime(r) }}</p>
+              <p class="text-xs font-bold text-gray-500">{{ r.flight?.route?.originAirport?.iataCode ?? r.flight?.originAirportIata }}</p>
+            </div>
+            <div class="flex-1 flex items-center gap-1">
+              <div class="flex-1 h-px bg-gray-200"></div>
+              <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="text-right">
+              <p class="text-3xl font-bold text-gray-900">{{ arrTime(r) }}</p>
+              <p class="text-xs font-bold text-gray-500">{{ r.flight?.route?.destinationAirport?.iataCode ?? r.flight?.destinationAirportIata }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pasajeros -->
+        <div class="space-y-3">
+          <h2 class="font-semibold text-gray-800 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            Pasajeros ({{ passengerStates().length }})
+          </h2>
+
+          <div *ngFor="let ps of passengerStates(); let i = index" class="border border-gray-200 rounded-xl overflow-hidden">
+            <button type="button" (click)="togglePassenger(i)"
+              class="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </div>
+                <div class="text-left">
+                  <p class="font-semibold text-gray-900 text-sm">{{ ps.passenger.firstName }} {{ ps.passenger.lastName }}</p>
+                  <p class="text-xs text-gray-400">Doc: {{ ps.passenger.documentNumber }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span [class]="'text-xs font-semibold px-2.5 py-1 rounded-full ' + checkInColor(ps)">{{ checkInLabel(ps) }}</span>
+                <svg [class]="'w-4 h-4 text-gray-400 transition-transform ' + (ps.expanded ? 'rotate-180' : '')" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </button>
+
+            <div *ngIf="ps.expanded" class="bg-gray-50 border-t border-gray-200 px-5 py-4 space-y-5">
+              <!-- Check-in -->
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Check-in</h4>
+                <div *ngIf="ps.loadingBP" class="flex justify-center py-2">
+                  <svg class="w-4 h-4 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                </div>
+                <ng-container *ngIf="!ps.loadingBP">
+                  <div *ngIf="ps.boardingPasses[0] as bp" class="bg-white border border-green-200 rounded-xl p-4 flex items-center gap-4">
+                    <svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div>
+                      <p class="font-semibold text-gray-800 text-sm">Check-in realizado</p>
+                      <p class="text-xs text-gray-500 font-mono mt-1">{{ bp.boardingCode }}</p>
+                    </div>
+                  </div>
+                  <ng-container *ngIf="!ps.boardingPasses[0] && canEdit()">
+                    <div *ngIf="ps.checkingIn" class="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                      <p class="text-xs text-gray-500">Se generará un código de embarque automáticamente.</p>
+                      <div class="flex gap-2">
+                        <button (click)="doCheckIn(i)"
+                          class="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+                          Confirmar check-in
+                        </button>
+                        <button (click)="updatePS(i, {checkingIn: false})"
+                          class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                    <button *ngIf="!ps.checkingIn" (click)="updatePS(i, {checkingIn: true})"
+                      class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                      Hacer check-in
+                    </button>
+                  </ng-container>
+                </ng-container>
+              </div>
+
+              <!-- Servicios -->
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center justify-between">
+                  <span>Servicios adicionales</span>
+                  <button *ngIf="canEdit() && !ps.addingService" (click)="updatePS(i, {addingService: true})"
+                    class="text-blue-600 hover:text-blue-700 flex items-center gap-0.5 font-semibold normal-case tracking-normal text-xs">
+                    + Agregar
+                  </button>
+                </h4>
+                <div *ngIf="ps.loadingServices" class="flex justify-center py-3">
+                  <svg class="w-4 h-4 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                </div>
+                <p *ngIf="!ps.loadingServices && ps.passengerServices.length === 0 && !ps.addingService" class="text-xs text-gray-400 italic">Sin servicios adicionales.</p>
+                <div *ngFor="let svc of ps.passengerServices" class="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 mb-2">
+                  <div>
+                    <p class="text-sm font-medium text-gray-800">{{ svc.serviceConfig?.service?.name ?? 'Servicio' }}</p>
+                    <p class="text-xs text-gray-400">{{ catLabel(svc.serviceConfig?.service?.category) }} · x{{ svc.quantity }}</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span *ngIf="svc.totalPrice > 0" class="text-xs font-semibold text-gray-700">\${{ (+svc.totalPrice).toFixed(2) }}</span>
+                    <button *ngIf="canEdit()" (click)="removeService(i, svc.id)"
+                      class="text-gray-300 hover:text-red-500 transition-colors">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div *ngIf="ps.addingService" class="bg-white border border-blue-200 rounded-lg p-3 space-y-2">
+                  <select [value]="ps.selectedConfig" (change)="updatePS(i, {selectedConfig: $any($event.target).value})"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">Selecciona un servicio...</option>
+                    <option *ngFor="let c of serviceConfigs()" [value]="c.id">
+                      {{ catLabel(c.service?.category) }} — {{ c.service?.name ?? c.id }} (\${{ c.price }} {{ c.currency }})
+                    </option>
+                  </select>
+                  <div class="flex gap-2">
+                    <button (click)="addService(i)" [disabled]="!ps.selectedConfig"
+                      class="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-60">
+                      Agregar servicio
+                    </button>
+                    <button (click)="updatePS(i, {addingService: false, selectedConfig: ''})"
+                      class="px-3 py-2 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Precio -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 class="font-semibold text-gray-800 mb-3">Resumen de precio</h2>
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-gray-800">Total pagado</span>
+            <span class="text-2xl font-bold text-blue-600">\${{ (+r.totalAmount).toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <!-- Cancelar -->
+        <button *ngIf="canEdit()" (click)="cancel(r.id)" [disabled]="cancelling()"
+          class="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 font-medium py-2.5 rounded-xl transition-colors disabled:opacity-50">
+          <svg *ngIf="cancelling()" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          {{ cancelling() ? 'Cancelando...' : 'Cancelar reserva' }}
+        </button>
+      </ng-container>
+    </div>
+  `,
+})
+export class ReservationDetailComponent implements OnInit {
+  route  = inject(ActivatedRoute);
+  router = inject(Router);
+  private resSvc    = inject(ReservationsService);
+  private bpSvc     = inject(BoardingPassesService);
+  private psSvc     = inject(PassengerServicesService);
+  private ascSvc    = inject(AirlineServiceConfigsService);
+
+  loading         = signal(true);
+  cancelling      = signal(false);
+  reservation     = signal<Reservation | null>(null);
+  passengerStates = signal<PassengerState[]>([]);
+  serviceConfigs  = signal<AirlineServiceConfig[]>([]);
+
+  ngOnInit() {
+    const id = this.route.snapshot.paramMap.get('id')!;
+    this.resSvc.getById(id).subscribe({
+      next: res => {
+        this.reservation.set(res.data);
+        this.loading.set(false);
+        const passengers = res.data.passengers ?? [];
+        this.passengerStates.set(passengers.map(p => ({
+          passenger: p, expanded: false, boardingPasses: [], passengerServices: [],
+          checkingIn: false, addingService: false, selectedConfig: '', loadingBP: false, loadingServices: false,
+        })));
+        const airlineId = res.data.flight?.airline?.id;
+        if (airlineId) {
+          this.ascSvc.byAirline(airlineId).subscribe({ next: r2 => this.serviceConfigs.set(r2.data), error: () => {} });
+        } else {
+          this.ascSvc.list().subscribe({ next: r2 => this.serviceConfigs.set(r2.data), error: () => {} });
+        }
+      },
+      error: () => this.loading.set(false),
+    });
+  }
+
+  canEdit() {
+    const s = this.reservation()?.status;
+    return s === 'CONFIRMED' || s === 'PENDING';
+  }
+
+  togglePassenger(i: number) {
+    const states = [...this.passengerStates()];
+    const ps     = { ...states[i], expanded: !states[i].expanded };
+    if (ps.expanded && !ps.loadingBP && ps.passenger.id) {
+      ps.loadingBP      = true;
+      ps.loadingServices= true;
+      states[i] = ps;
+      this.passengerStates.set(states);
+      const passId = ps.passenger.id!;
+      this.bpSvc.byPassenger(passId).subscribe({
+        next: r => {
+          const s2 = [...this.passengerStates()];
+          s2[i] = { ...s2[i], boardingPasses: r.data, loadingBP: false };
+          this.passengerStates.set(s2);
+        },
+        error: () => {
+          const s2 = [...this.passengerStates()]; s2[i] = { ...s2[i], loadingBP: false }; this.passengerStates.set(s2);
+        },
+      });
+      this.psSvc.byPassenger(passId).subscribe({
+        next: r => {
+          const s2 = [...this.passengerStates()];
+          s2[i] = { ...s2[i], passengerServices: r.data, loadingServices: false };
+          this.passengerStates.set(s2);
+        },
+        error: () => {
+          const s2 = [...this.passengerStates()]; s2[i] = { ...s2[i], loadingServices: false }; this.passengerStates.set(s2);
+        },
+      });
+    } else {
+      states[i] = ps;
+      this.passengerStates.set(states);
+    }
+  }
+
+  updatePS(i: number, partial: Partial<PassengerState>) {
+    const s = [...this.passengerStates()];
+    s[i] = { ...s[i], ...partial };
+    this.passengerStates.set(s);
+  }
+
+  doCheckIn(i: number) {
+    const ps         = this.passengerStates()[i];
+    const passId     = ps.passenger.id;
+    const segmentId  = this.reservation()?.flight?.segments?.[0]?.id;
+    if (!passId || !segmentId) { alert('No se encontró información del segmento.'); return; }
+    this.bpSvc.create({ passengerId: passId, segmentId, boardingCode: generateBoardingCode(passId), status: 'CHECKED_IN' }).subscribe({
+      next: r => {
+        const s2 = [...this.passengerStates()];
+        s2[i] = { ...s2[i], boardingPasses: [r.data], checkingIn: false };
+        this.passengerStates.set(s2);
+      },
+      error: err => alert(err?.error?.error?.message ?? 'Error al hacer check-in'),
+    });
+  }
+
+  addService(i: number) {
+    const ps     = this.passengerStates()[i];
+    const config = this.serviceConfigs().find(c => c.id === ps.selectedConfig);
+    const passId = ps.passenger.id;
+    if (!config || !passId) return;
+    this.psSvc.create({ passengerId: passId, serviceConfigId: config.id, quantity: 1, unitPriceAtBooking: config.price }).subscribe({
+      next: r => {
+        const s2 = [...this.passengerStates()];
+        s2[i] = { ...s2[i], passengerServices: [...s2[i].passengerServices, r.data], addingService: false, selectedConfig: '' };
+        this.passengerStates.set(s2);
+      },
+      error: err => alert(err?.error?.error?.message ?? 'Error al agregar servicio'),
+    });
+  }
+
+  removeService(i: number, svcId: string) {
+    this.psSvc.remove(svcId).subscribe({
+      next: () => {
+        const s2 = [...this.passengerStates()];
+        s2[i] = { ...s2[i], passengerServices: s2[i].passengerServices.filter(s => s.id !== svcId) };
+        this.passengerStates.set(s2);
+      },
+    });
+  }
+
+  cancel(id: string) {
+    if (!confirm('¿Cancelar esta reserva?')) return;
+    this.cancelling.set(true);
+    this.resSvc.cancel(id).subscribe({
+      next: () => this.router.navigate(['/my-trips']),
+      error: () => this.cancelling.set(false),
+    });
+  }
+
+  statusStyle(s: string) { return STATUS_STYLES[s] ?? ''; }
+  statusLabel(s: string) { return STATUS_LABELS[s] ?? s; }
+
+  checkInLabel(ps: PassengerState) {
+    const status = ps.boardingPasses[0]?.checkInStatus ?? 'NOT_CHECKED_IN';
+    return CHECKIN_LABELS[status]?.label ?? status;
+  }
+  checkInColor(ps: PassengerState) {
+    const status = ps.boardingPasses[0]?.checkInStatus ?? 'NOT_CHECKED_IN';
+    return CHECKIN_LABELS[status]?.color ?? '';
+  }
+
+  catLabel(cat?: string) { return cat ? (SERVICE_CAT_LABELS[cat] ?? cat) : ''; }
+
+  createdDate(r: Reservation) {
+    try { return format(new Date(r.createdAt), "d 'de' MMMM, yyyy", { locale: es }); } catch { return r.createdAt; }
+  }
+  depTime(r: Reservation) {
+    const d = r.flight?.departureDateTime ?? r.flight?.departureDate;
+    if (!d) return '--:--';
+    try { return format(new Date(d), 'HH:mm'); } catch { return '--:--'; }
+  }
+  arrTime(r: Reservation) {
+    const d = r.flight?.arrivalDateTime;
+    if (!d) return '--:--';
+    try { return format(new Date(d), 'HH:mm'); } catch { return '--:--'; }
+  }
+}

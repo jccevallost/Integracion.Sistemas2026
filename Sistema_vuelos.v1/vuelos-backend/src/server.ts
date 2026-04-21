@@ -70,6 +70,7 @@ const PORT = Number(process.env.PORT) || 3000;
 // ── CORS ─────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:4200',
   'http://localhost:3000',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
