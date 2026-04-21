@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: vuelos-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false        # se pone manualmente en el dashboard de Render
+      - key: JWT_SECRET
+        sync: false        # se pone manualmente en el dashboard de Render
+      - key: FRONTEND_URL
+        sync: false        # URL del frontend desplegado (ej. https://vuelos.vercel.app)
+      - key: JWT_EXPIRES_IN
+        value: 7d

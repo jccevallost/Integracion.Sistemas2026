@@ -1,0 +1,23 @@
+// infrastructure/queries/index.ts
+export { FlightQueryRepository }               from '../../modules/api_flights/queries/FlightQueryRepository.js';
+export { ReservationQueryRepository }          from '../../modules/api_reservations/queries/ReservationQueryRepository.js';
+export { UserQueryRepository }                 from '../../modules/api_users/queries/UserQueryRepository.js';
+export { AirportQueryRepository }              from '../../modules/api_airports/queries/AirportQueryRepository.js';
+export { CountryQueryRepository }              from '../../modules/api_countries/queries/CountryQueryRepository.js';
+export { CityQueryRepository }                 from '../../modules/api_cities/queries/CityQueryRepository.js';
+export { AirlineQueryRepository }              from '../../modules/api_airlines/queries/AirlineQueryRepository.js';
+export { AircraftQueryRepository }             from '../../modules/api_aircrafts/queries/AircraftQueryRepository.js';
+export { AirlineAirportQueryRepository }       from '../../modules/api_airline_airports/queries/AirlineAirportQueryRepository.js';
+export { AirlineServiceConfigQueryRepository } from '../../modules/api_airline_service_configs/queries/AirlineServiceConfigQueryRepository.js';
+export { FlightClassQueryRepository }          from '../../modules/api_flight_classes/queries/FlightClassQueryRepository.js';
+export { SegmentQueryRepository }              from '../../modules/api_segments/queries/SegmentQueryRepository.js';
+export { ServiceCatalogQueryRepository }       from '../../modules/api_service_catalog/queries/ServiceCatalogQueryRepository.js';
+export { PromotionQueryRepository }            from '../../modules/api_promotions/queries/PromotionQueryRepository.js';
+export { BillingProfileQueryRepository }       from '../../modules/api_billing_profiles/queries/BillingProfileQueryRepository.js';
+export { PaymentQueryRepository }              from '../../modules/api_payments/queries/PaymentQueryRepository.js';
+export { InvoiceQueryRepository }              from '../../modules/api_invoices/queries/InvoiceQueryRepository.js';
+export { InvoiceItemQueryRepository }          from '../../modules/api_invoice_items/queries/InvoiceItemQueryRepository.js';
+export { BoardingPassQueryRepository }         from '../../modules/api_boarding_passes/queries/BoardingPassQueryRepository.js';
+export { PassengerServiceQueryRepository }     from '../../modules/api_passenger_services/queries/PassengerServiceQueryRepository.js';
+export { ReservationPassengerQueryRepository } from '../../modules/api_reservation_passengers/queries/ReservationPassengerQueryRepository.js';
+export { AuditLogQueryRepository }             from '../../modules/api_audit_logs/queries/AuditLogQueryRepository.js';
