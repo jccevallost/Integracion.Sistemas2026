@@ -72,6 +72,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4200',
   'http://localhost:3000',
+  'https://mango-meadow-0d3fdd810.7.azurestaticapps.net',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
