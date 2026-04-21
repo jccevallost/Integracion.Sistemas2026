@@ -34,11 +34,16 @@ jobs:
       - name: Remove dev dependencies
         run: npm prune --omit=dev
 
+      - name: Package node_modules for Oryx (Linux binary)
+        run: cd node_modules && tar -czf ../node_modules.tar.gz . && cd ..
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: Sistema_vuelos.v1/vuelos-backend
+          exclude: |
+            node_modules
 
   deploy:
     runs-on: ubuntu-latest
