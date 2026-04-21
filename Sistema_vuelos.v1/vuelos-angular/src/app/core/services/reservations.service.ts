@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { ApiSuccess, Reservation } from '../models/domain';
 
-const BASE = 'http://https://integracion-sistemas2026.onrender.com/api/v1';
+const BASE = 'https://integracion-sistemas2026.onrender.com/api/v1';
 
 export interface CreateReservationPayload {
   flightClassId: string;

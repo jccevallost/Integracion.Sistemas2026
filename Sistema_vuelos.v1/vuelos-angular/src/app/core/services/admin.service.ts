@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AuthStore } from '../store/auth.store';
 
-const API_URL = 'http://https://integracion-sistemas2026.onrender.com/api/v1';
+const API_URL = 'https://integracion-sistemas2026.onrender.com/api/v1';
 
 function extractData(res: any): any[] {
   if (res?.data?.data) return res.data.data;

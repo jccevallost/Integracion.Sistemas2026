@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { ApiSuccess, Flight, FlightSearchParams } from '../models/domain';
 
-const BASE = 'http://https://integracion-sistemas2026.onrender.com/api/v1';
+const BASE = 'https://integracion-sistemas2026.onrender.com/api/v1';
 
 @Injectable({ providedIn: 'root' })
 export class FlightsService {
