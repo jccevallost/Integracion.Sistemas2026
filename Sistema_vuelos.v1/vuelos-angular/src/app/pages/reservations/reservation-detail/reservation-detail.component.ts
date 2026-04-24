@@ -5,7 +5,9 @@ import { ReservationsService } from '../../../core/services/reservations.service
 import { BoardingPassesService } from '../../../core/services/boarding-passes.service';
 import { PassengerServicesService } from '../../../core/services/passenger-services.service';
 import { AirlineServiceConfigsService } from '../../../core/services/airline-service-configs.service';
-import type { Reservation, Passenger, BoardingPass, PassengerService, AirlineServiceConfig } from '../../../core/models/domain';
+import { PaymentsService } from '../../../core/services/payments.service';
+import { InvoicesService } from '../../../core/services/invoices.service';
+import type { Reservation, Passenger, BoardingPass, PassengerService, AirlineServiceConfig, Payment, Invoice } from '../../../core/models/domain';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -203,13 +205,43 @@ interface PassengerState {
           </div>
         </div>
 
-        <!-- Precio -->
+        <!-- Factura / Resumen de pago -->
         <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 class="font-semibold text-gray-800 mb-3">Resumen de precio</h2>
-          <div class="flex items-center justify-between">
-            <span class="font-semibold text-gray-800">Total pagado</span>
-            <span class="text-2xl font-bold text-blue-600">\${{ (+r.totalAmount).toFixed(2) }}</span>
-          </div>
+          <h2 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Factura
+          </h2>
+          <ng-container *ngIf="invoice() as inv">
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-gray-500">
+                <span>N° Factura</span>
+                <span class="font-mono font-semibold text-gray-800">{{ inv.invoiceNumber }}</span>
+              </div>
+              <div *ngIf="payment() as p" class="flex justify-between text-gray-500">
+                <span>Método de pago</span>
+                <span class="font-medium text-gray-700">{{ p.provider }}</span>
+              </div>
+              <div class="flex justify-between text-gray-500 pt-2 border-t border-gray-100">
+                <span>Subtotal</span>
+                <span>\${{ (+inv.subtotal).toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between text-gray-500">
+                <span>IVA 15%</span>
+                <span>\${{ (+inv.taxAmount).toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between font-semibold text-gray-800 text-base pt-2 border-t border-gray-100">
+                <span>Total</span>
+                <span class="text-blue-600">\${{ (+inv.total).toFixed(2) }}</span>
+              </div>
+            </div>
+          </ng-container>
+          <ng-container *ngIf="!invoice()">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-800">Total pagado</span>
+              <span class="text-2xl font-bold text-blue-600">\${{ (+r.totalAmount).toFixed(2) }}</span>
+            </div>
+            <p *ngIf="payment()" class="text-xs text-gray-400 mt-2">Factura en proceso de generación...</p>
+          </ng-container>
         </div>
 
         <!-- Cancelar -->
@@ -225,16 +257,20 @@ interface PassengerState {
 export class ReservationDetailComponent implements OnInit {
   route  = inject(ActivatedRoute);
   router = inject(Router);
-  private resSvc    = inject(ReservationsService);
-  private bpSvc     = inject(BoardingPassesService);
-  private psSvc     = inject(PassengerServicesService);
-  private ascSvc    = inject(AirlineServiceConfigsService);
+  private resSvc     = inject(ReservationsService);
+  private bpSvc      = inject(BoardingPassesService);
+  private psSvc      = inject(PassengerServicesService);
+  private ascSvc     = inject(AirlineServiceConfigsService);
+  private paymentSvc = inject(PaymentsService);
+  private invoiceSvc = inject(InvoicesService);
 
   loading         = signal(true);
   cancelling      = signal(false);
   reservation     = signal<Reservation | null>(null);
   passengerStates = signal<PassengerState[]>([]);
   serviceConfigs  = signal<AirlineServiceConfig[]>([]);
+  payment         = signal<Payment | null>(null);
+  invoice         = signal<Invoice | null>(null);
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -253,6 +289,20 @@ export class ReservationDetailComponent implements OnInit {
         } else {
           this.ascSvc.list().subscribe({ next: r2 => this.serviceConfigs.set(r2.data), error: () => {} });
         }
+        this.paymentSvc.byReservation(id).subscribe({
+          next: pr => {
+            const payments = pr.data as any[];
+            if (payments.length > 0) {
+              const p = payments[0];
+              this.payment.set(p);
+              this.invoiceSvc.byPayment(p.id).subscribe({
+                next: ir => this.invoice.set(ir.data),
+                error: () => {},
+              });
+            }
+          },
+          error: () => {},
+        });
       },
       error: () => this.loading.set(false),
     });

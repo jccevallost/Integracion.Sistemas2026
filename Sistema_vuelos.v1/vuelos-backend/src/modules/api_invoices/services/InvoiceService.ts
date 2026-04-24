@@ -18,6 +18,10 @@ export class InvoiceService implements IInvoiceService {
     return this.repo.findByBillingProfile(billingProfileId);
   }
 
+  async findByPayment(paymentId: string) {
+    return this.repo.findByPayment(paymentId);
+  }
+
   async create(data: any) { return this.repo.create(data); }
 
   async update(id: string, data: any) {

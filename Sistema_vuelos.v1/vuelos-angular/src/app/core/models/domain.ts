@@ -92,6 +92,11 @@ export interface BoardingPass {
   checkInStatus: CheckInStatus; boardingGroup?: string | null;
   gate?: string | null; checkInAt?: string | null; createdAt: string;
 }
+export interface Invoice {
+  id: string; invoiceNumber: string; paymentId: string; billingProfileId: string;
+  subtotal: number; taxAmount: number; total: number; createdAt: string;
+  billingProfile?: BillingProfile; payment?: Payment;
+}
 export interface PassengerService {
   id: string; passengerId: string; serviceConfigId: string;
   quantity: number; unitPriceAtBooking: number; totalPrice: number;

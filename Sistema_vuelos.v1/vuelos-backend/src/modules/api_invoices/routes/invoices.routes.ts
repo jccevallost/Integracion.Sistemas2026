@@ -7,6 +7,7 @@ export function createInvoiceRouter(controller: InvoiceController): Router {
   const router = Router();
   router.get('/',                                        authenticate, requireAdmin, controller.list);
   router.get('/by-billing-profile/:billingProfileId',    authenticate, controller.listByBillingProfile);
+  router.get('/by-payment/:paymentId',                   authenticate, controller.getByPayment);
   router.get('/:id',                                     authenticate, controller.getById);
   router.post('/',                                       authenticate, requireAdmin, controller.create);
   router.put('/:id',                                     authenticate, requireAdmin, controller.update);

@@ -5,7 +5,8 @@ import { ReactiveFormsModule, FormsModule, FormBuilder, FormArray, Validators } 
 import { ReservationsService } from '../../../core/services/reservations.service';
 import { PaymentsService } from '../../../core/services/payments.service';
 import { PromotionsService } from '../../../core/services/promotions.service';
-import type { PromotionValidation } from '../../../core/models/domain';
+import { InvoicesService } from '../../../core/services/invoices.service';
+import type { PromotionValidation, Invoice } from '../../../core/models/domain';
 
 const CARD_PROVIDERS = [
   { value: 'VISA', label: 'Visa' }, { value: 'MASTERCARD', label: 'Mastercard' },
@@ -22,6 +23,54 @@ function generateTxId() {
   imports: [CommonModule, ReactiveFormsModule, FormsModule],
   template: `
     <div class="max-w-2xl mx-auto px-4 py-8">
+
+      <!-- Pantalla de éxito -->
+      <ng-container *ngIf="successData() as sd">
+        <div class="flex flex-col items-center text-center py-10 space-y-6">
+          <div class="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+            <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">¡Pago exitoso!</h1>
+            <p class="text-sm text-gray-500 mt-1">Tu reserva ha sido confirmada</p>
+          </div>
+          <div class="w-full bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 text-left">
+            <div class="flex items-center justify-between px-5 py-3">
+              <span class="text-sm text-gray-500">Código de reserva</span>
+              <span class="font-mono font-bold text-blue-600">{{ sd.reservationCode }}</span>
+            </div>
+            <ng-container *ngIf="sd.invoice as inv">
+              <div class="flex items-center justify-between px-5 py-3">
+                <span class="text-sm text-gray-500">N° Factura</span>
+                <span class="font-mono font-semibold text-gray-800">{{ inv.invoiceNumber }}</span>
+              </div>
+              <div class="flex items-center justify-between px-5 py-3">
+                <span class="text-sm text-gray-500">Subtotal</span>
+                <span class="text-sm text-gray-700">\${{ (+inv.subtotal).toFixed(2) }}</span>
+              </div>
+              <div class="flex items-center justify-between px-5 py-3">
+                <span class="text-sm text-gray-500">IVA 15%</span>
+                <span class="text-sm text-gray-700">\${{ (+inv.taxAmount).toFixed(2) }}</span>
+              </div>
+              <div class="flex items-center justify-between px-5 py-4">
+                <span class="font-semibold text-gray-800">Total pagado</span>
+                <span class="text-xl font-bold text-blue-600">\${{ (+inv.total).toFixed(2) }}</span>
+              </div>
+            </ng-container>
+            <div *ngIf="!sd.invoice" class="flex items-center justify-between px-5 py-4">
+              <span class="font-semibold text-gray-800">Total pagado</span>
+              <span class="text-xl font-bold text-blue-600">—</span>
+            </div>
+          </div>
+          <p class="text-xs text-gray-400">La factura fue generada automáticamente y está disponible en el detalle de tu reserva.</p>
+          <button (click)="router.navigate(['/my-trips', sd.reservationId])"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors">
+            Ver mi reserva
+          </button>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="!successData()">
       <button (click)="goBack()" class="text-sm text-blue-600 hover:underline mb-6 flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         {{ step() === 2 ? 'Volver a datos de pasajeros' : 'Volver' }}
@@ -197,26 +246,29 @@ function generateTxId() {
           {{ payLoading() ? 'Procesando pago...' : 'Confirmar y pagar' }}
         </button>
       </form>
+      </ng-container>
     </div>
   `,
 })
 export class ReservationComponent implements OnInit {
   private route      = inject(ActivatedRoute);
-  private router     = inject(Router);
+  router             = inject(Router);
   private fb         = inject(FormBuilder);
   private resSvc     = inject(ReservationsService);
   private paymentSvc = inject(PaymentsService);
   private promoSvc   = inject(PromotionsService);
+  private invoiceSvc = inject(InvoicesService);
 
-  step        = signal<1 | 2>(1);
-  errorMsg    = signal<string | null>(null);
-  payLoading  = signal(false);
-  promoLoading= signal(false);
-  promoError  = signal<string | null>(null);
-  promoResult = signal<PromotionValidation | null>(null);
-  promoCode   = '';
-  cardDisplay = '';
-  cardProviders = CARD_PROVIDERS;
+  step           = signal<1 | 2>(1);
+  errorMsg       = signal<string | null>(null);
+  payLoading     = signal(false);
+  promoLoading   = signal(false);
+  promoError     = signal<string | null>(null);
+  promoResult    = signal<PromotionValidation | null>(null);
+  successData    = signal<{ reservationId: string; reservationCode: string; invoice: Invoice | null } | null>(null);
+  promoCode      = '';
+  cardDisplay    = '';
+  cardProviders  = CARD_PROVIDERS;
   steps = [{ n: 1, label: 'Pasajeros' }, { n: 2, label: 'Pago' }];
 
   flightClassId = '';
@@ -318,8 +370,25 @@ export class ReservationComponent implements OnInit {
           provider:      this.payForm.value.provider!,
           transactionId: generateTxId(),
         }).subscribe({
-          next: () => { this.payLoading.set(false); this.router.navigate(['/my-trips', reservation.id]); },
-          error: () => { this.payLoading.set(false); this.router.navigate(['/my-trips', reservation.id]); },
+          next: payRes => {
+            const payment = payRes.data;
+            setTimeout(() => {
+              this.invoiceSvc.byPayment(payment.id).subscribe({
+                next: invRes => {
+                  this.payLoading.set(false);
+                  this.successData.set({ reservationId: reservation.id, reservationCode: reservation.reservationCode, invoice: invRes.data });
+                },
+                error: () => {
+                  this.payLoading.set(false);
+                  this.successData.set({ reservationId: reservation.id, reservationCode: reservation.reservationCode, invoice: null });
+                },
+              });
+            }, 1200);
+          },
+          error: () => {
+            this.payLoading.set(false);
+            this.successData.set({ reservationId: reservation.id, reservationCode: reservation.reservationCode, invoice: null });
+          },
         });
       },
       error: err => {

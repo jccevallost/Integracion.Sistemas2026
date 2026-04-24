@@ -26,6 +26,13 @@ export class InvoiceController {
     } catch (err) { next(err); }
   };
 
+  getByPayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await this.service.findByPayment(String(req.params.paymentId));
+      res.json({ success: true, data });
+    } catch (err) { next(err); }
+  };
+
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const data = await this.service.create(req.body);

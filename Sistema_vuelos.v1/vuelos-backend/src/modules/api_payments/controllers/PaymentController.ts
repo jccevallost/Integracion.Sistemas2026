@@ -28,7 +28,8 @@ export class PaymentController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const data = await this.service.create(req.body);
+      const userId = (req as any).user?.id as string | undefined;
+      const data = await this.service.create(req.body, userId);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   };
