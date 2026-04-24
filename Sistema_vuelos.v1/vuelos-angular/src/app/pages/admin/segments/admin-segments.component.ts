@@ -6,12 +6,13 @@ import { AdminFormModalComponent } from '../../../shared/components/admin-form-m
 import { AdminService } from '../../../core/services/admin.service';
 
 type Row = { id: string; segmentNumber: string; flightId?: string; originAirportId: string; destinationAirportId: string; departureDateTime: string; arrivalDateTime: string; airlineId: string; aircraftId?: string; estimatedDuration: number; originAirport?: { iataCode: string }; destinationAirport?: { iataCode: string } };
-type Flight  = { id: string; flightNumber: string };
+type Flight  = { id: string; flightNumber?: string; originAirportIata?: string; destinationAirportIata?: string };
 type Airport = { id: string; iataCode: string; name: string; city?: { name: string } };
 type Airline = { id: string; name: string; iataCode: string };
 type Aircraft = { id: string; modelName: string; registration: string };
 const empty = (): Partial<Row> => ({ segmentNumber: '', flightId: '', originAirportId: '', destinationAirportId: '', departureDateTime: '', arrivalDateTime: '', airlineId: '', aircraftId: '', estimatedDuration: 60 });
 const toLocalInput = (iso: string) => iso ? iso.slice(0, 16) : '';
+const toISO = (dt: string) => { if (!dt) return dt; const d = new Date(dt); return isNaN(d.getTime()) ? dt : d.toISOString(); };
 
 @Component({ selector: 'app-admin-segments', standalone: true, imports: [CommonModule, FormsModule, AdminTableComponent, AdminFormModalComponent],
   template: `
@@ -24,7 +25,7 @@ const toLocalInput = (iso: string) => iso ? iso.slice(0, 16) : '';
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Vuelo</label>
         <select [(ngModel)]="form().flightId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
           <option value="">— Sin vuelo —</option>
-          <option *ngFor="let f of flights()" [value]="f.id">{{ f.flightNumber }}</option>
+          <option *ngFor="let f of flights()" [value]="f.id">{{ f.originAirportIata ?? '?' }} → {{ f.destinationAirportIata ?? '?' }}</option>
         </select></div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Aerolínea *</label>
         <select [(ngModel)]="form().airlineId" required class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
@@ -82,7 +83,7 @@ export class AdminSegmentsComponent implements OnInit {
   save(e: Event) {
     e.preventDefault(); this.saving.set(true);
     const f = this.form() as any;
-    const body: any = { segmentNumber: f.segmentNumber, originAirportId: f.originAirportId, destinationAirportId: f.destinationAirportId, departureDateTime: f.departureDateTime, arrivalDateTime: f.arrivalDateTime, airlineId: f.airlineId, estimatedDuration: Number(f.estimatedDuration) };
+    const body: any = { segmentNumber: f.segmentNumber, originAirportId: f.originAirportId, destinationAirportId: f.destinationAirportId, departureDateTime: toISO(f.departureDateTime), arrivalDateTime: toISO(f.arrivalDateTime), airlineId: f.airlineId, estimatedDuration: Number(f.estimatedDuration) };
     if (f.flightId) body.flightId = f.flightId;
     if (f.aircraftId) body.aircraftId = f.aircraftId;
     const obs = f.id ? this.svc.updateSegment(f.id, body) : this.svc.createSegment(body);
