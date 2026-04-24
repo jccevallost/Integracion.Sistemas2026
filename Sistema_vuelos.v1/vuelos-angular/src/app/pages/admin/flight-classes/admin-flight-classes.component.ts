@@ -51,8 +51,12 @@ export class AdminFlightClassesComponent implements OnInit {
   load() { this.svc.getFlightClasses().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, flight, totalSeats, ...body } = this.form() as any;
-    const obs = id ? this.svc.updateFlightClass(id, body) : this.svc.createFlightClass(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body = { flightId: f.flightId, cabinClass: f.cabinClass, basePrice: f.basePrice, availableSeats: f.availableSeats };
+    const obs = f.id ? this.svc.updateFlightClass(f.id, body) : this.svc.createFlightClass(body);
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { console.error('Error guardando clase:', err); this.saving.set(false); } });
+  }
   del(id: string) { this.svc.deleteFlightClass(id).subscribe(() => this.load()); }
 }

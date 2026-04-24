@@ -48,8 +48,8 @@ export class AdminSegmentsComponent implements OnInit {
   airports = signal<Airport[]>([]);
   cols = [
     { key: 'route', label: 'Ruta', render: (r: Row) => `${r.originAirport?.iataCode ?? '?'} → ${r.destinationAirport?.iataCode ?? '?'}` },
-    { key: 'departureTime', label: 'Salida', render: (r: Row) => r.departureTime ? new Date(r.departureTime).toLocaleString('es-EC') : '—' },
-    { key: 'arrivalTime', label: 'Llegada', render: (r: Row) => r.arrivalTime ? new Date(r.arrivalTime).toLocaleString('es-EC') : '—' },
+    { key: 'departureDateTime', label: 'Salida', render: (r: Row) => r.departureDateTime ? new Date(r.departureDateTime).toLocaleString('es-EC') : '—' },
+    { key: 'arrivalDateTime', label: 'Llegada', render: (r: Row) => r.arrivalDateTime ? new Date(r.arrivalDateTime).toLocaleString('es-EC') : '—' },
     { key: 'segmentOrder', label: '#', render: (r: Row) => String(r.segmentOrder ?? '—') },
   ];
   ngOnInit() {
@@ -60,8 +60,12 @@ export class AdminSegmentsComponent implements OnInit {
   load() { this.svc.getSegments().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r, departureDateTime: toLocalInput(r.departureDateTime), arrivalDateTime: toLocalInput(r.arrivalDateTime) }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, originAirport, destinationAirport, ...body } = this.form() as any;
-    const obs = id ? this.svc.updateSegment(id, body) : this.svc.createSegment(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body = { flightId: f.flightId, originAirportId: f.originAirportId, destinationAirportId: f.destinationAirportId, departureDateTime: f.departureDateTime, arrivalDateTime: f.arrivalDateTime, segmentOrder: f.segmentOrder };
+    const obs = f.id ? this.svc.updateSegment(f.id, body) : this.svc.createSegment(body);
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { console.error('Error guardando segmento:', err); this.saving.set(false); } });
+  }
   del(id: string) { this.svc.deleteSegment(id).subscribe(() => this.load()); }
 }
