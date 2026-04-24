@@ -5,7 +5,7 @@ import { AdminTableComponent } from '../../../shared/components/admin-table/admi
 import { AdminFormModalComponent } from '../../../shared/components/admin-form-modal/admin-form-modal.component';
 import { AdminService } from '../../../core/services/admin.service';
 
-type Row = { id: string; flightNumber: string; airlineId: string; aircraftId: string; status: string; originAirport?: { iataCode: string }; destinationAirport?: { iataCode: string } };
+type Row = { id: string; flightNumber: string; airlineId: string; aircraftId: string; status: string; originAirportIata?: string; destinationAirportIata?: string; originAirport?: { iataCode: string }; destinationAirport?: { iataCode: string } };
 type Airline  = { id: string; name: string; iataCode: string };
 type Aircraft = { id: string; modelName: string; registration: string };
 const empty = (): Partial<Row> => ({ flightNumber: '', airlineId: '', aircraftId: '', status: 'SCHEDULED' });
@@ -46,7 +46,7 @@ export class AdminFlightsComponent implements OnInit {
   aircraft = signal<Aircraft[]>([]);
   cols = [
     { key: 'flightNumber', label: 'Vuelo', renderHtml: (r: Row) => `<span class="font-mono font-bold text-blue-600">${r.flightNumber}</span>` },
-    { key: 'route', label: 'Ruta', render: (r: Row) => `${r.originAirport?.iataCode ?? '?'} → ${r.destinationAirport?.iataCode ?? '?'}` },
+    { key: 'route', label: 'Ruta', render: (r: Row) => `${r.originAirportIata ?? r.originAirport?.iataCode ?? '?'} → ${r.destinationAirportIata ?? r.destinationAirport?.iataCode ?? '?'}` },
     { key: 'status', label: 'Estado', render: (r: Row) => r.status },
   ];
   ngOnInit() {
