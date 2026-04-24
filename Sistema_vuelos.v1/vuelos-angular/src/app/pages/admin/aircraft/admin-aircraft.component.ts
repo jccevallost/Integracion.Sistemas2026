@@ -5,9 +5,9 @@ import { AdminTableComponent } from '../../../shared/components/admin-table/admi
 import { AdminFormModalComponent } from '../../../shared/components/admin-form-modal/admin-form-modal.component';
 import { AdminService } from '../../../core/services/admin.service';
 
-type Row = { id: string; modelName: string; registration: string; airlineId: string; totalSeats?: number; hasWifi?: boolean; hasUsb?: boolean; airline?: { name: string } };
+type Row = { id: string; modelName: string; registration: string; airlineId: string; hasWifi?: boolean; hasUsb?: boolean; airline?: { name: string } };
 type Airline = { id: string; name: string; iataCode: string };
-const empty = (): Partial<Row> => ({ modelName: '', registration: '', airlineId: '', totalSeats: undefined, hasWifi: false, hasUsb: false });
+const empty = (): Partial<Row> => ({ modelName: '', registration: '', airlineId: '', hasWifi: false, hasUsb: false });
 
 @Component({ selector: 'app-admin-aircraft', standalone: true, imports: [CommonModule, FormsModule, AdminTableComponent, AdminFormModalComponent],
   template: `
@@ -24,8 +24,6 @@ const empty = (): Partial<Row> => ({ modelName: '', registration: '', airlineId:
           <option value="">— Selecciona una aerolínea —</option>
           <option *ngFor="let a of airlines()" [value]="a.id">{{ a.name }} ({{ a.iataCode }})</option>
         </select></div>
-      <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Asientos</label>
-        <input [(ngModel)]="form().totalSeats" type="number" min="1" max="900" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
       <div class="flex gap-4 items-center pt-1">
         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input [(ngModel)]="form().hasWifi" type="checkbox" class="rounded" /> WiFi a bordo
@@ -45,7 +43,6 @@ export class AdminAircraftComponent implements OnInit {
     { key: 'modelName', label: 'Modelo', render: (r: Row) => r.modelName },
     { key: 'registration', label: 'Matrícula', renderHtml: (r: Row) => `<span class="font-mono font-bold text-blue-600">${r.registration}</span>` },
     { key: 'airline', label: 'Aerolínea', render: (r: Row) => r.airline?.name ?? '—' },
-    { key: 'totalSeats', label: 'Asientos', render: (r: Row) => String(r.totalSeats ?? '—') },
   ];
   ngOnInit() {
     this.load();
@@ -54,8 +51,12 @@ export class AdminAircraftComponent implements OnInit {
   load() { this.svc.getAircraft().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, airline, ...body } = this.form() as any;
-    const obs = id ? this.svc.updateAircraft(id, body) : this.svc.createAircraft(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body = { modelName: f.modelName, registration: f.registration, airlineId: f.airlineId, hasWifi: f.hasWifi ?? false, hasUsb: f.hasUsb ?? false };
+    const obs = f.id ? this.svc.updateAircraft(f.id, body) : this.svc.createAircraft(body);
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { console.error('Error aeronave:', err); this.saving.set(false); } });
+  }
   del(id: string) { this.svc.deleteAircraft(id).subscribe(() => this.load()); }
 }

@@ -12,7 +12,7 @@ const empty = (): Partial<Row> => ({ flightId: '', cabinClass: 'ECONOMY', basePr
 @Component({ selector: 'app-admin-flight-classes', standalone: true, imports: [CommonModule, FormsModule, AdminTableComponent, AdminFormModalComponent],
   template: `
     <app-admin-table title="Clases de Vuelo" [data]="rows()" [columns]="cols" [isLoading]="loading()" [isDeleting]="saving()"
-      [searchKeys]="['classType']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
+      [searchKeys]="['cabinClass']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
     <app-admin-form-modal [title]="form().id ? 'Editar Clase' : 'Nueva Clase'" [open]="modal()" [isLoading]="saving()"
       (onClose)="modal.set(false)" (onSubmit)="save($event)">
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Vuelo *</label>

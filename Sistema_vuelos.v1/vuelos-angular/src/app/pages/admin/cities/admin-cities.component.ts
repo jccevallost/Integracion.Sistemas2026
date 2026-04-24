@@ -43,8 +43,12 @@ export class AdminCitiesComponent implements OnInit {
   load() { this.svc.getCities().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, country, ...body } = this.form() as any;
-    const obs = id ? this.svc.updateCity(id, body) : this.svc.createCity(body);
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body: any = { name: f.name, countryId: f.countryId };
+    if (f.iataCode) body.iataCode = f.iataCode;
+    const obs = f.id ? this.svc.updateCity(f.id, body) : this.svc.createCity(body);
     obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
   del(id: string) { this.svc.deleteCity(id).subscribe(() => this.load()); }
 }

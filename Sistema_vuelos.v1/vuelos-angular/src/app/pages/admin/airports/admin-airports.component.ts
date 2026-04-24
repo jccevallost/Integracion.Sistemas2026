@@ -55,8 +55,11 @@ export class AdminAirportsComponent implements OnInit {
   load() { this.svc.getAirports().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, city, ...body } = this.form() as any;
-    const obs = id ? this.svc.updateAirport(id, body) : this.svc.createAirport(body);
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body = { iataCode: (f.iataCode ?? '').toUpperCase(), name: f.name, cityId: f.cityId, timezone: f.timezone };
+    const obs = f.id ? this.svc.updateAirport(f.id, body) : this.svc.createAirport(body);
     obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
   del(id: string) { this.svc.deleteAirport(id).subscribe(() => this.load()); }
 }

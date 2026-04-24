@@ -46,8 +46,14 @@ export class AdminBoardingPassesComponent implements OnInit {
   load() { this.svc.getBoardingPasses().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, ...body } = this.form() as Row;
-    const obs = id ? this.svc.updateBoardingPass(id, body) : this.svc.createBoardingPass(body);
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body: any = { passengerId: f.passengerId, segmentId: f.segmentId, boardingCode: f.boardingCode, status: f.status };
+    if (f.gate) body.gate = f.gate;
+    if (f.boardingGroup) body.boardingGroup = f.boardingGroup;
+    if (f.checkInAt) body.checkInAt = f.checkInAt;
+    const obs = f.id ? this.svc.updateBoardingPass(f.id, body) : this.svc.createBoardingPass(body);
     obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
   del(id: string) { this.svc.deleteBoardingPass(id).subscribe(() => this.load()); }
 }

@@ -41,8 +41,13 @@ export class AdminCountriesComponent implements OnInit {
   load() { this.svc.getCountries().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r }); this.modal.set(true); }
-  save(e: Event) { e.preventDefault(); this.saving.set(true); const { id, ...body } = this.form() as Row;
-    const obs = id ? this.svc.updateCountry(id, body) : this.svc.createCountry(body);
+  save(e: Event) {
+    e.preventDefault(); this.saving.set(true);
+    const f = this.form() as any;
+    const body: any = { name: f.name, isoCode: f.isoCode };
+    if (f.phoneCode) body.phoneCode = f.phoneCode;
+    if (f.currencyCode) body.currencyCode = f.currencyCode;
+    const obs = f.id ? this.svc.updateCountry(f.id, body) : this.svc.createCountry(body);
     obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: () => this.saving.set(false) }); }
   del(id: string) { this.svc.deleteCountry(id).subscribe(() => this.load()); }
 }
