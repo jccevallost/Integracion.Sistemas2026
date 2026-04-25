@@ -26,7 +26,7 @@ const empty = (): Partial<Row> => ({ reservationId: '', amount: 0, provider: 'VI
           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
           <option value="">— Selecciona reserva —</option>
           <option *ngFor="let r of reservations()" [value]="r.id">
-            {{ r.reservationCode }}{{ r.user ? ' · ' + r.user.firstName + ' ' + r.user.firstLastName : '' }} — ${{ (+r.totalAmount).toFixed(2) }}
+            {{ r.reservationCode }}{{ r.user ? ' · ' + r.user.firstName + ' ' + r.user.firstLastName : '' }} — $ {{ (+r.totalAmount).toFixed(2) }}
           </option>
         </select></div>
 

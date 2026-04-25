@@ -24,7 +24,7 @@ const empty = (): Partial<Row> => ({ passengerId: '', serviceConfigId: '', quant
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Servicio (configuración) *</label>
         <select [(ngModel)]="form().serviceConfigId" required (ngModelChange)="onConfigChange($event)" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
           <option value="">— Selecciona servicio —</option>
-          <option *ngFor="let c of serviceConfigs()" [value]="c.id">{{ c.service?.name ?? c.id }} · {{ c.airline?.name }} · ${{ (+c.price).toFixed(2) }} {{ c.currency }}</option>
+          <option *ngFor="let c of serviceConfigs()" [value]="c.id">{{ c.service?.name ?? c.id }} · {{ c.airline?.name }} · $ {{ (+c.price).toFixed(2) }} {{ c.currency }}</option>
         </select></div>
       <div class="grid grid-cols-2 gap-3">
         <div><label class="block text-sm font-medium text-gray-700 mb-1">Cantidad *</label>

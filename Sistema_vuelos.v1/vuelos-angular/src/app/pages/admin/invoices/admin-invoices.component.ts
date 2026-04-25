@@ -36,7 +36,7 @@ const empty = (): Partial<Row> => ({ invoiceNumber: genInvNum(), paymentId: '', 
           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
           <option value="">— Selecciona pago —</option>
           <option *ngFor="let p of payments()" [value]="p.id">
-            {{ p.reservation?.reservationCode ?? p.id.slice(0,8) }} — ${{ (+p.amount).toFixed(2) }}{{ p.transactionId ? ' · ' + p.transactionId.slice(0,16) + '…' : '' }}
+            {{ p.reservation?.reservationCode ?? p.id.slice(0,8) }} — $ {{ (+p.amount).toFixed(2) }}{{ p.transactionId ? ' · ' + p.transactionId.slice(0,16) + '…' : '' }}
           </option>
         </select></div>
 
