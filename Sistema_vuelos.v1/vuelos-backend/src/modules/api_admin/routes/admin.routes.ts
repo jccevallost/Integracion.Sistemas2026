@@ -5,8 +5,26 @@ import { AdminController } from '../controllers/AdminController.js';
 import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
 import type { PrismaClient } from '@prisma/client';
 
+async function audit(db: PrismaClient, req: any, action: string, entity: string, entityId: string, oldData: any, newData: any) {
+  try {
+    await db.auditLog.create({
+      data: {
+        userId:    (req as any).user?.id ?? null,
+        action,
+        entity,
+        entityId,
+        oldData:   oldData  ?? undefined,
+        newData:   newData  ?? undefined,
+        ipAddress: req.ip   ?? null,
+        userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+      },
+    });
+  } catch { /* auditoría no bloquea la operación */ }
+}
+
 // Repositorios genéricos usados directamente para CRUD simple de catálogos
 function makeGenericRouter(db: PrismaClient, model: any, include?: object): Router {
+  const entityName = String(model);
   const router = Router();
   router.get('/', async (_req, res, next) => {
     try {
@@ -24,13 +42,16 @@ function makeGenericRouter(db: PrismaClient, model: any, include?: object): Rout
   router.post('/', async (req, res, next) => {
     try {
       const data = await (db as any)[model].create({ data: req.body, include });
+      await audit(db, req, 'CREATE', entityName, data.id, null, data);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
-  // Acepta tanto PATCH (actualización parcial) como PUT (reemplazo completo)
   const updateHandler = async (req: any, res: any, next: any) => {
     try {
-      const data = await (db as any)[model].update({ where: { id: String(req.params.id) }, data: req.body, include });
+      const id = String(req.params.id);
+      const oldData = await (db as any)[model].findUnique({ where: { id } });
+      const data = await (db as any)[model].update({ where: { id }, data: req.body, include });
+      await audit(db, req, 'UPDATE', entityName, id, oldData, data);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };
@@ -38,7 +59,10 @@ function makeGenericRouter(db: PrismaClient, model: any, include?: object): Rout
   router.put('/:id',   updateHandler);
   router.delete('/:id', async (req, res, next) => {
     try {
-      await (db as any)[model].delete({ where: { id: String(req.params.id) } });
+      const id = String(req.params.id);
+      const oldData = await (db as any)[model].findUnique({ where: { id } });
+      await (db as any)[model].delete({ where: { id } });
+      await audit(db, req, 'DELETE', entityName, id, oldData, null);
       res.json({ success: true, data: { deleted: true } });
     } catch (err) { next(err); }
   });
@@ -116,12 +140,17 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
     try {
       const { airlineId, airportId } = req.body;
       const data = await db.airlineAirport.create({ data: { airlineId, airportId }, include: { airline: true, airport: true } });
+      await audit(db, req, 'CREATE', 'airlineAirport', `${airlineId}_${airportId}`, null, data);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
   router.delete('/airline-airports/:airlineId/:airportId', ...auth, async (req, res, next) => {
     try {
-      await db.airlineAirport.delete({ where: { airlineId_airportId: { airlineId: String(req.params.airlineId), airportId: String(req.params.airportId) } } });
+      const airlineId = String(req.params.airlineId);
+      const airportId = String(req.params.airportId);
+      const oldData = await db.airlineAirport.findFirst({ where: { airlineId, airportId } });
+      await db.airlineAirport.delete({ where: { airlineId_airportId: { airlineId: String(airlineId), airportId: String(airportId) } } });
+      await audit(db, req, 'DELETE', 'airlineAirport', `${airlineId}_${airportId}`, oldData, null);
       res.json({ success: true, data: { deleted: true } });
     } catch (err) { next(err); }
   });

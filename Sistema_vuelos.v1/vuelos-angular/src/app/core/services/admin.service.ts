@@ -129,4 +129,39 @@ export class AdminService {
   createPromotion(b: unknown)              { return this.post('/admin/promotions', b); }
   updatePromotion(id: string, b: unknown)  { return this.patch(`/admin/promotions/${id}`, b); }
   deletePromotion(id: string)              { return this.del(`/admin/promotions/${id}`); }
+
+  // Airline Service Configs
+  getAirlineServiceConfigs()                              { return this.get('/admin/airline-service-config'); }
+  createAirlineServiceConfig(b: unknown)                  { return this.post('/admin/airline-service-config', b); }
+  updateAirlineServiceConfig(id: string, b: unknown)      { return this.patch(`/admin/airline-service-config/${id}`, b); }
+  deleteAirlineServiceConfig(id: string)                  { return this.del(`/admin/airline-service-config/${id}`); }
+
+  // Airline Airports (composite key — special endpoints)
+  getAirlineAirports()                                    { return this.get('/admin/airline-airports'); }
+  createAirlineAirport(b: unknown)                        { return this.post('/admin/airline-airports', b); }
+  deleteAirlineAirport(airlineId: string, airportId: string) { return this.del(`/admin/airline-airports/${airlineId}/${airportId}`); }
+
+  // Billing Profiles
+  getBillingProfiles()                            { return this.get('/admin/billing-profiles'); }
+  createBillingProfile(b: unknown)                { return this.post('/admin/billing-profiles', b); }
+  updateBillingProfile(id: string, b: unknown)    { return this.patch(`/admin/billing-profiles/${id}`, b); }
+  deleteBillingProfile(id: string)                { return this.del(`/admin/billing-profiles/${id}`); }
+
+  // Invoice Items
+  getInvoiceItems()                               { return this.get('/admin/invoice-items'); }
+  createInvoiceItem(b: unknown)                   { return this.post('/admin/invoice-items', b); }
+  updateInvoiceItem(id: string, b: unknown)        { return this.patch(`/admin/invoice-items/${id}`, b); }
+  deleteInvoiceItem(id: string)                   { return this.del(`/admin/invoice-items/${id}`); }
+
+  // Passenger Services
+  getPassengerServices()                                  { return this.get('/admin/passenger-services'); }
+  createPassengerService(b: unknown)                      { return this.post('/admin/passenger-services', b); }
+  updatePassengerService(id: string, b: unknown)          { return this.patch(`/admin/passenger-services/${id}`, b); }
+  deletePassengerService(id: string)                      { return this.del(`/admin/passenger-services/${id}`); }
+
+  // Reservation Passengers
+  getReservationPassengers()                                  { return this.get('/admin/reservation-passengers'); }
+  createReservationPassenger(b: unknown)                      { return this.post('/admin/reservation-passengers', b); }
+  updateReservationPassenger(id: string, b: unknown)          { return this.patch(`/admin/reservation-passengers/${id}`, b); }
+  deleteReservationPassenger(id: string)                      { return this.del(`/admin/reservation-passengers/${id}`); }
 }

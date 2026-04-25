@@ -130,6 +130,30 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/admin/services/admin-services.component').then(m => m.AdminServicesComponent),
       },
       {
+        path: 'airline-service-configs',
+        loadComponent: () => import('./pages/admin/airline-service-configs/admin-airline-service-configs.component').then(m => m.AdminAirlineServiceConfigsComponent),
+      },
+      {
+        path: 'airline-airports',
+        loadComponent: () => import('./pages/admin/airline-airports/admin-airline-airports.component').then(m => m.AdminAirlineAirportsComponent),
+      },
+      {
+        path: 'billing-profiles',
+        loadComponent: () => import('./pages/admin/billing-profiles/admin-billing-profiles.component').then(m => m.AdminBillingProfilesComponent),
+      },
+      {
+        path: 'invoice-items',
+        loadComponent: () => import('./pages/admin/invoice-items/admin-invoice-items.component').then(m => m.AdminInvoiceItemsComponent),
+      },
+      {
+        path: 'passenger-services',
+        loadComponent: () => import('./pages/admin/passenger-services/admin-passenger-services.component').then(m => m.AdminPassengerServicesComponent),
+      },
+      {
+        path: 'reservation-passengers',
+        loadComponent: () => import('./pages/admin/reservation-passengers/admin-reservation-passengers.component').then(m => m.AdminReservationPassengersComponent),
+      },
+      {
         path: 'audit',
         loadComponent: () => import('./pages/admin/audit/admin-audit.component').then(m => m.AdminAuditComponent),
       },
