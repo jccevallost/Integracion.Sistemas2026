@@ -1225,6 +1225,51 @@
  *     responses:
  *       200:
  *         description: Pasajeros de la reserva
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/ReservationPassenger' }
+ *
+ * /reservation-passengers:
+ *   post:
+ *     tags: [Reservation Passengers]
+ *     summary: Crear pasajero de reserva (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reservationId, flightClassId, firstName, lastName, documentNumber]
+ *             properties:
+ *               reservationId:  { type: string, format: uuid }
+ *               flightClassId:  { type: string, format: uuid }
+ *               firstName:      { type: string, example: Juan }
+ *               lastName:       { type: string, example: Pérez }
+ *               documentNumber: { type: string, example: "A1234567" }
+ *               seatNumber:     { type: string, nullable: true, example: "12A" }
+ *     responses:
+ *       201:
+ *         description: Pasajero creado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/ReservationPassenger' }
+ *       400:
+ *         description: Campos requeridos faltantes
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ValidationErrorResponse' }
  *
  * /reservation-passengers/{id}:
  *   get:
@@ -1451,6 +1496,54 @@
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  *
+ * /invoices/by-payment/{paymentId}:
+ *   get:
+ *     tags: [Invoices]
+ *     summary: Factura asociada a un pago
+ *     description: Endpoint disponible para usuarios autenticados (no solo admin). Útil en el checkout para mostrar la factura al cliente.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Factura del pago
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/Invoice' }
+ *       404:
+ *         description: No hay factura para ese pago
+ *
+ * /invoices/by-billing-profile/{billingProfileId}:
+ *   get:
+ *     tags: [Invoices]
+ *     summary: Facturas de un perfil de facturación
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: billingProfileId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Lista de facturas del perfil
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Invoice' }
+ *
  * /invoices/{id}:
  *   get:
  *     tags: [Invoices]
@@ -1464,8 +1557,51 @@
  *     responses:
  *       200:
  *         description: Factura encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/Invoice' }
  *       404:
  *         description: No encontrada
+ *   patch:
+ *     tags: [Invoices]
+ *     summary: Actualizar factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               invoiceNumber:    { type: string }
+ *               billingProfileId: { type: string, format: uuid }
+ *               subtotal:         { type: number }
+ *               taxAmount:        { type: number }
+ *               total:            { type: number }
+ *     responses:
+ *       200:
+ *         description: Factura actualizada
+ *   delete:
+ *     tags: [Invoices]
+ *     summary: Eliminar factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Factura eliminada
  */
 
 // ════════════════════════════════════════════════════════
@@ -1923,30 +2059,63 @@
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ValidationErrorResponse' }
  *
- * /airline-airports/{id}:
+ * /airline-airports/by-airline/{airlineId}:
  *   get:
  *     tags: [Airline Airports]
- *     summary: Obtener relación por ID
+ *     summary: Aeropuertos operados por una aerolínea
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: airlineId
  *         required: true
  *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
- *         description: Relación encontrada
+ *         description: Lista de aeropuertos de la aerolínea
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/AirlineAirport' }
+ *
+ * /airline-airports/by-airport/{airportId}:
+ *   get:
+ *     tags: [Airline Airports]
+ *     summary: Aerolíneas que operan en un aeropuerto
+ *     parameters:
+ *       - in: path
+ *         name: airportId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Lista de aerolíneas del aeropuerto
+ *
+ * /airline-airports/{airlineId}/{airportId}:
  *   delete:
  *     tags: [Airline Airports]
- *     summary: Eliminar relación (Admin)
+ *     summary: Eliminar relación aerolínea-aeropuerto (Admin)
+ *     description: |
+ *       Usa clave compuesta — no hay un campo `id` en esta tabla.
+ *       Ambos parámetros son requeridos.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: airlineId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: airportId
  *         required: true
  *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Relación eliminada
+ *       404:
+ *         description: Relación no encontrada
  */
 
 // ════════════════════════════════════════════════════════
@@ -2391,6 +2560,592 @@
  *     responses:
  *       200:
  *         description: Usuario eliminado
+ *
+ * /admin/billing-profiles:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar todos los perfiles de facturación (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de perfiles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/BillingProfile' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear perfil de facturación (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, taxId, businessName, address, cityId]
+ *             properties:
+ *               userId:       { type: string, format: uuid }
+ *               taxId:        { type: string, example: "1791234567001" }
+ *               businessName: { type: string, example: "Juan Pérez" }
+ *               address:      { type: string }
+ *               cityId:       { type: string, format: uuid }
+ *               email:        { type: string, format: email, nullable: true }
+ *               isDefault:    { type: boolean, default: false }
+ *     responses:
+ *       201:
+ *         description: Perfil creado
+ *
+ * /admin/billing-profiles/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar perfil de facturación (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               taxId:        { type: string }
+ *               businessName: { type: string }
+ *               address:      { type: string }
+ *               isDefault:    { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar perfil de facturación (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Perfil eliminado
+ *
+ * /admin/invoices:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar todas las facturas (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de facturas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Invoice' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear factura manualmente (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [paymentId, billingProfileId, invoiceNumber, subtotal, taxAmount, total]
+ *             properties:
+ *               paymentId:        { type: string, format: uuid }
+ *               billingProfileId: { type: string, format: uuid }
+ *               invoiceNumber:    { type: string, example: "INV-20260425-AB1234" }
+ *               subtotal:         { type: number, example: 130.43 }
+ *               taxAmount:        { type: number, example: 19.57 }
+ *               total:            { type: number, example: 150.00 }
+ *     responses:
+ *       201:
+ *         description: Factura creada
+ *
+ * /admin/invoices/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               invoiceNumber: { type: string }
+ *               subtotal:      { type: number }
+ *               taxAmount:     { type: number }
+ *               total:         { type: number }
+ *     responses:
+ *       200:
+ *         description: Factura actualizada
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Factura eliminada
+ *
+ * /admin/invoice-items:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar todos los ítems de factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de ítems
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/InvoiceItem' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear ítem de factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [invoiceId, description, quantity, unitPrice, totalPrice]
+ *             properties:
+ *               invoiceId:   { type: string, format: uuid }
+ *               description: { type: string, example: "Vuelo UIO-GYE Clase Económica" }
+ *               quantity:    { type: integer, minimum: 1 }
+ *               unitPrice:   { type: number }
+ *               totalPrice:  { type: number, description: "= quantity × unitPrice" }
+ *     responses:
+ *       201:
+ *         description: Ítem creado
+ *
+ * /admin/invoice-items/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar ítem de factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               description: { type: string }
+ *               quantity:    { type: integer }
+ *               unitPrice:   { type: number }
+ *               totalPrice:  { type: number }
+ *     responses:
+ *       200:
+ *         description: Ítem actualizado
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar ítem de factura (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Ítem eliminado
+ *
+ * /admin/reservation-passengers:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar pasajeros de reservas (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de pasajeros
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/ReservationPassenger' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear pasajero de reserva (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reservationId, flightClassId, firstName, lastName, documentNumber]
+ *             properties:
+ *               reservationId:  { type: string, format: uuid }
+ *               flightClassId:  { type: string, format: uuid }
+ *               firstName:      { type: string }
+ *               lastName:       { type: string }
+ *               documentNumber: { type: string }
+ *               seatNumber:     { type: string, nullable: true }
+ *     responses:
+ *       201:
+ *         description: Pasajero creado
+ *
+ * /admin/reservation-passengers/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar pasajero de reserva (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:      { type: string }
+ *               lastName:       { type: string }
+ *               documentNumber: { type: string }
+ *               seatNumber:     { type: string, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Pasajero actualizado
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar pasajero de reserva (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Pasajero eliminado
+ *
+ * /admin/boarding-passes:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar todos los pases de abordar (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de pases
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/BoardingPass' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear pase de abordar (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [passengerId, segmentId, boardingCode]
+ *             properties:
+ *               passengerId:   { type: string, format: uuid, description: "ReservationPassenger.id" }
+ *               segmentId:     { type: string, format: uuid }
+ *               boardingCode:  { type: string, example: "BP-ABCD-EFGH" }
+ *               gate:          { type: string, nullable: true }
+ *               boardingGroup: { type: string, nullable: true }
+ *               status:        { type: string, enum: [NOT_CHECKED_IN, CHECKED_IN, BOARDED, NO_SHOW], default: NOT_CHECKED_IN }
+ *     responses:
+ *       201:
+ *         description: Pase creado
+ *
+ * /admin/boarding-passes/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar pase de abordar (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               gate:          { type: string }
+ *               boardingGroup: { type: string }
+ *               status:        { type: string, enum: [NOT_CHECKED_IN, CHECKED_IN, BOARDED, NO_SHOW] }
+ *     responses:
+ *       200:
+ *         description: Pase actualizado
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar pase de abordar (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Pase eliminado
+ *
+ * /admin/passenger-services:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar servicios de pasajeros (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de servicios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/PassengerService' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Agregar servicio a pasajero (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [passengerId, serviceConfigId, quantity, unitPriceAtBooking]
+ *             properties:
+ *               passengerId:        { type: string, format: uuid, description: "ReservationPassenger.id" }
+ *               serviceConfigId:    { type: string, format: uuid, description: "AirlineServiceConfig.id" }
+ *               quantity:           { type: integer, minimum: 1 }
+ *               unitPriceAtBooking: { type: number }
+ *     responses:
+ *       201:
+ *         description: Servicio agregado
+ *
+ * /admin/passenger-services/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar servicio de pasajero (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity:           { type: integer }
+ *               unitPriceAtBooking: { type: number }
+ *     responses:
+ *       200:
+ *         description: Servicio actualizado
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar servicio de pasajero (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Servicio eliminado
+ *
+ * /admin/airline-airports:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar relaciones aerolínea-aeropuerto (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de relaciones
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/AirlineAirport' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear relación aerolínea-aeropuerto (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [airlineId, airportId]
+ *             properties:
+ *               airlineId: { type: string, format: uuid }
+ *               airportId: { type: string, format: uuid }
+ *     responses:
+ *       201:
+ *         description: Relación creada
+ *       409:
+ *         description: Ya existe esa relación
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /admin/airline-airports/{airlineId}/{airportId}:
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar relación aerolínea-aeropuerto (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: airlineId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: airportId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Relación eliminada
+ *
+ * /admin/airline-service-config:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Listar configuraciones de precios por aerolínea (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Lista de configuraciones
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/AirlineServiceConfig' } }
+ *   post:
+ *     tags: [Admin]
+ *     summary: Crear precio de servicio para aerolínea (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceId, airlineId, price]
+ *             properties:
+ *               serviceId:       { type: string, format: uuid }
+ *               airlineId:       { type: string, format: uuid }
+ *               price:           { type: number, example: 25.00 }
+ *               currency:        { type: string, example: USD, default: USD }
+ *               originAirportId: { type: string, format: uuid, nullable: true }
+ *               destAirportId:   { type: string, format: uuid, nullable: true }
+ *     responses:
+ *       201:
+ *         description: Configuración creada
+ *
+ * /admin/airline-service-config/{id}:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Actualizar precio de servicio (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               price:           { type: number }
+ *               currency:        { type: string }
+ *               originAirportId: { type: string, format: uuid, nullable: true }
+ *               destAirportId:   { type: string, format: uuid, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Configuración actualizada
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Eliminar configuración de precio (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Configuración eliminada
+ *
+ * /admin/auditlogs:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Ver logs de auditoría desde el panel admin
+ *     description: Alias del endpoint /audit-logs con acceso desde el panel de administración.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50 }
+ *     responses:
+ *       200:
+ *         description: Logs de auditoría
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }
  */
 
 // ════════════════════════════════════════════════════════
@@ -2401,7 +3156,10 @@
  * /audit-logs:
  *   get:
  *     tags: [Audit Logs]
- *     summary: Listar logs de auditoría (Admin)
+ *     summary: Listar logs de auditoría (Admin) con paginación
+ *     description: |
+ *       Registra automáticamente TODOS los cambios del sistema (CREATE / UPDATE / DELETE).
+ *       El sistema captura `oldData` antes de cada mutación para comparación.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: query
@@ -2421,15 +3179,83 @@
  *                 success: { type: boolean }
  *                 data:
  *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:        { type: string, format: uuid }
- *                       action:    { type: string }
- *                       entity:    { type: string }
- *                       entityId:  { type: string }
- *                       userId:    { type: string, nullable: true }
- *                       createdAt: { type: string, format: date-time }
+ *                   items: { $ref: '#/components/schemas/AuditLog' }
+ *                 pagination: { $ref: '#/components/schemas/Pagination' }
+ *
+ * /audit-logs/by-user/{userId}:
+ *   get:
+ *     tags: [Audit Logs]
+ *     summary: Logs de auditoría de un usuario específico (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Logs del usuario
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/AuditLog' }
+ *
+ * /audit-logs/by-entity:
+ *   get:
+ *     tags: [Audit Logs]
+ *     summary: Logs filtrados por entidad (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: entity
+ *         required: true
+ *         schema: { type: string }
+ *         description: "Nombre de la entidad (ej: payment, reservation, flight)"
+ *       - in: query
+ *         name: entityId
+ *         schema: { type: string }
+ *         description: ID específico del recurso (opcional)
+ *     responses:
+ *       200:
+ *         description: Logs de la entidad
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/AuditLog' }
+ *
+ * /audit-logs/{id}:
+ *   get:
+ *     tags: [Audit Logs]
+ *     summary: Obtener log de auditoría por ID (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Log encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/AuditLog' }
+ *       404:
+ *         description: Log no encontrado
  */
 
 export {};
