@@ -8,6 +8,8 @@ export class Promotion {
     public discountType: DiscountType,
     public discountValue: number,
     public isActive: boolean,
+    public maxUsages: number | null = null,
+    public currentUsages: number = 0,
   ) {}
 
   applyDiscount(amount: number): number {

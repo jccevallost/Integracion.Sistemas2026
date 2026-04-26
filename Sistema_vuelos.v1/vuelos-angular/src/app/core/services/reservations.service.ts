@@ -30,6 +30,13 @@ export class ReservationsService {
     return this.http.patch<ApiSuccess<Reservation>>(`${BASE}/reservations/${id}/cancel`, {});
   }
 
+  setSeat(reservationId: string, passengerId: string, seatNumber: string) {
+    return this.http.patch<ApiSuccess<any>>(
+      `${BASE}/reservations/${reservationId}/passengers/${passengerId}/seat`,
+      { seatNumber },
+    );
+  }
+
   listAll() {
     return this.http.get<ApiSuccess<Reservation[]>>(`${BASE}/reservations`);
   }

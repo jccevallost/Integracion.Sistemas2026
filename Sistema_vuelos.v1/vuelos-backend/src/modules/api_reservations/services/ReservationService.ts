@@ -41,6 +41,9 @@ export class ReservationService implements IReservationService {
       if (!promo || !promo.isActive) {
         throw new ValidationException('Código promocional inválido o inactivo');
       }
+      if (promo.maxUsages !== null && Number(promo.currentUsages) >= Number(promo.maxUsages)) {
+        throw new ValidationException('Este código promocional ha alcanzado su límite máximo de usos');
+      }
       const promoEntity = new Promotion(
         promo.id, promo.code, promo.discountType as any,
         Number(promo.discountValue), promo.isActive,
@@ -89,7 +92,16 @@ export class ReservationService implements IReservationService {
       throw new ValidationException('No se puede cancelar una reserva completada');
     }
 
-    await this.reservationRepository.updateStatus(id, 'CANCELLED');
+    const passengers = (reservation as any).passengers ?? [];
+    const flightClassId = passengers[0]?.flightClassId ?? null;
+    const passengerCount = passengers.length;
+
+    if (flightClassId && passengerCount > 0) {
+      await this.reservationRepository.cancelAndRestoreSeats(id, flightClassId, passengerCount);
+    } else {
+      await this.reservationRepository.updateStatus(id, 'CANCELLED');
+    }
+
     return { cancelled: true, reservationCode: reservation.reservationCode };
   }
 

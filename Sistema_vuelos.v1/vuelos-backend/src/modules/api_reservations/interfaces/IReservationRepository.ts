@@ -7,4 +7,5 @@ export interface IReservationRepository extends IBaseRepository<Reservation> {
   findByIdWithRelations(id: string): Promise<any | null>;
   findAllWithRelations(): Promise<any[]>;
   updateStatus(id: string, status: string): Promise<void>;
+  cancelAndRestoreSeats(id: string, flightClassId: string, passengerCount: number): Promise<void>;
 }

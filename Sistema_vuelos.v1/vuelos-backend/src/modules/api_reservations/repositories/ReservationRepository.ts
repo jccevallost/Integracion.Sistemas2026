@@ -105,6 +105,18 @@ export class ReservationRepository implements IReservationRepository {
     }) as any;
   }
 
+  async cancelAndRestoreSeats(id: string, flightClassId: string, passengerCount: number): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      await tx.reservation.update({ where: { id }, data: { status: 'CANCELLED' } });
+      if (flightClassId && passengerCount > 0) {
+        await tx.flightClass.update({
+          where: { id: flightClassId },
+          data: { availableSeats: { increment: passengerCount } },
+        });
+      }
+    });
+  }
+
   async update(id: string, data: any): Promise<Reservation> {
     return this.db.reservation.update({ where: { id }, data }) as any;
   }

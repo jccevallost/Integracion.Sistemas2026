@@ -3,6 +3,9 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/AdminController.js';
 import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
+import { validate } from '../../../shared/middlewares/validate.middleware.js';
+import { CreateFlightClassSchema, UpdateFlightClassSchema } from '../../../shared/schemas/validation.schemas.js';
+import type { ZodSchema } from 'zod';
 import type { PrismaClient } from '@prisma/client';
 
 async function audit(db: PrismaClient, req: any, action: string, entity: string, entityId: string, oldData: any, newData: any) {
@@ -23,7 +26,12 @@ async function audit(db: PrismaClient, req: any, action: string, entity: string,
 }
 
 // Repositorios genéricos usados directamente para CRUD simple de catálogos
-function makeGenericRouter(db: PrismaClient, model: any, include?: object): Router {
+function makeGenericRouter(
+  db: PrismaClient,
+  model: any,
+  include?: object,
+  schemas?: { create?: ZodSchema; update?: ZodSchema },
+): Router {
   const entityName = String(model);
   const router = Router();
   router.get('/', async (_req, res, next) => {
@@ -39,13 +47,15 @@ function makeGenericRouter(db: PrismaClient, model: any, include?: object): Rout
       res.json({ success: true, data });
     } catch (err) { next(err); }
   });
-  router.post('/', async (req, res, next) => {
+  const createMiddlewares: any[] = schemas?.create ? [validate(schemas.create)] : [];
+  router.post('/', ...createMiddlewares, async (req: any, res: any, next: any) => {
     try {
       const data = await (db as any)[model].create({ data: req.body, include });
       await audit(db, req, 'CREATE', entityName, data.id, null, data);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
+  const updateMiddlewares: any[] = schemas?.update ? [validate(schemas.update)] : [];
   const updateHandler = async (req: any, res: any, next: any) => {
     try {
       const id = String(req.params.id);
@@ -55,8 +65,8 @@ function makeGenericRouter(db: PrismaClient, model: any, include?: object): Rout
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };
-  router.patch('/:id', updateHandler);
-  router.put('/:id',   updateHandler);
+  router.patch('/:id', ...updateMiddlewares, updateHandler);
+  router.put('/:id',   ...updateMiddlewares, updateHandler);
   router.delete('/:id', async (req, res, next) => {
     try {
       const id = String(req.params.id);
@@ -156,7 +166,7 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
   });
 
   // ── Vuelos ──────────────────────────────────────────────────
-  router.use('/flightclasses', ...auth, makeGenericRouter(db, 'flightClass', { flight: true }));
+  router.use('/flightclasses', ...auth, makeGenericRouter(db, 'flightClass', { flight: true }, { create: CreateFlightClassSchema, update: UpdateFlightClassSchema }));
   router.use('/segments',      ...auth, makeGenericRouter(db, 'segment', {
     originAirport: true,
     destinationAirport: true,

@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ReservationsService } from '../../../core/services/reservations.service';
 import { BoardingPassesService } from '../../../core/services/boarding-passes.service';
 import { PassengerServicesService } from '../../../core/services/passenger-services.service';
@@ -42,6 +43,7 @@ interface PassengerState {
   checkingIn: boolean;
   addingService: boolean;
   selectedConfig: string;
+  seatInput: string;
   loadingBP: boolean;
   loadingServices: boolean;
 }
@@ -49,7 +51,7 @@ interface PassengerState {
 @Component({
   selector: 'app-reservation-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div class="max-w-2xl mx-auto px-4 py-8 space-y-5">
       <button (click)="router.navigate(['/my-trips'])" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
@@ -125,22 +127,42 @@ interface PassengerState {
                   <svg class="w-4 h-4 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                 </div>
                 <ng-container *ngIf="!ps.loadingBP">
-                  <div *ngIf="ps.boardingPasses[0] as bp" class="bg-white border border-green-200 rounded-xl p-4 flex items-center gap-4">
-                    <svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <div>
-                      <p class="font-semibold text-gray-800 text-sm">Check-in realizado</p>
-                      <p class="text-xs text-gray-500 font-mono mt-1">{{ bp.boardingCode }}</p>
+                  <div *ngIf="ps.boardingPasses[0] as bp" class="bg-white border border-green-200 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center gap-4">
+                      <svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      <div>
+                        <p class="font-semibold text-gray-800 text-sm">Check-in realizado</p>
+                        <p class="text-xs text-gray-500 font-mono mt-1">{{ bp.boardingCode }}</p>
+                      </div>
+                    </div>
+                    <!-- Asiento asignado o selector de asiento -->
+                    <div class="border-t border-gray-100 pt-3">
+                      <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Asiento</p>
+                      <p *ngIf="ps.passenger.seatNumber" class="text-sm font-semibold text-blue-700 font-mono">{{ ps.passenger.seatNumber }}</p>
+                      <div *ngIf="!ps.passenger.seatNumber && canEdit()" class="flex gap-2">
+                        <input [(ngModel)]="ps.seatInput" placeholder="Ej: 14C"
+                          class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <button (click)="saveSeat(i)" [disabled]="!ps.seatInput"
+                          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-60">
+                          Asignar
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <ng-container *ngIf="!ps.boardingPasses[0] && canEdit()">
                     <div *ngIf="ps.checkingIn" class="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                      <p class="text-xs text-gray-500">Se generará un código de embarque automáticamente.</p>
+                      <p class="text-xs text-gray-500">Elige tu asiento y confirma el check-in.</p>
+                      <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Número de asiento (opcional)</label>
+                        <input [(ngModel)]="ps.seatInput" placeholder="Ej: 14C"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
                       <div class="flex gap-2">
                         <button (click)="doCheckIn(i)"
                           class="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors">
                           Confirmar check-in
                         </button>
-                        <button (click)="updatePS(i, {checkingIn: false})"
+                        <button (click)="updatePS(i, {checkingIn: false, seatInput: ''})"
                           class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
                           Cancelar
                         </button>
@@ -173,7 +195,7 @@ interface PassengerState {
                     <p class="text-xs text-gray-400">{{ catLabel(svc.serviceConfig?.service?.category) }} · x{{ svc.quantity }}</p>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span *ngIf="svc.totalPrice > 0" class="text-xs font-semibold text-gray-700">\${{ (+svc.totalPrice).toFixed(2) }}</span>
+                    <span *ngIf="svc.quantity && svc.unitPriceAtBooking" class="text-xs font-semibold text-gray-700">\${{ (svc.quantity * (+svc.unitPriceAtBooking)).toFixed(2) }}</span>
                     <button *ngIf="canEdit()" (click)="removeService(i, svc.id)"
                       class="text-gray-300 hover:text-red-500 transition-colors">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -281,7 +303,8 @@ export class ReservationDetailComponent implements OnInit {
         const passengers = res.data.passengers ?? [];
         this.passengerStates.set(passengers.map(p => ({
           passenger: p, expanded: false, boardingPasses: [], passengerServices: [],
-          checkingIn: false, addingService: false, selectedConfig: '', loadingBP: false, loadingServices: false,
+          checkingIn: false, addingService: false, selectedConfig: '', seatInput: '',
+          loadingBP: false, loadingServices: false,
         })));
         const airlineId = res.data.flight?.airline?.id;
         if (airlineId) {
@@ -355,17 +378,45 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   doCheckIn(i: number) {
-    const ps         = this.passengerStates()[i];
-    const passId     = ps.passenger.id;
-    const segmentId  = this.reservation()?.flight?.segments?.[0]?.id;
+    const ps        = this.passengerStates()[i];
+    const passId    = ps.passenger.id;
+    const resId     = this.reservation()?.id;
+    const segmentId = this.reservation()?.flight?.segments?.[0]?.id;
     if (!passId || !segmentId) { alert('No se encontró información del segmento.'); return; }
     this.bpSvc.create({ passengerId: passId, segmentId, boardingCode: generateBoardingCode(passId), status: 'CHECKED_IN' }).subscribe({
       next: r => {
+        const seatToSet = ps.seatInput?.trim().toUpperCase();
         const s2 = [...this.passengerStates()];
-        s2[i] = { ...s2[i], boardingPasses: [r.data], checkingIn: false };
+        s2[i] = { ...s2[i], boardingPasses: [r.data], checkingIn: false, seatInput: '' };
         this.passengerStates.set(s2);
+        if (seatToSet && resId) {
+          this.resSvc.setSeat(resId, passId, seatToSet).subscribe({
+            next: () => {
+              const s3 = [...this.passengerStates()];
+              s3[i] = { ...s3[i], passenger: { ...s3[i].passenger, seatNumber: seatToSet } as any };
+              this.passengerStates.set(s3);
+            },
+            error: err => alert(err?.error?.error?.message ?? 'Check-in OK, pero no se pudo asignar el asiento'),
+          });
+        }
       },
       error: err => alert(err?.error?.error?.message ?? 'Error al hacer check-in'),
+    });
+  }
+
+  saveSeat(i: number) {
+    const ps    = this.passengerStates()[i];
+    const resId = this.reservation()?.id;
+    const passId = ps.passenger.id;
+    const seat   = ps.seatInput?.trim().toUpperCase();
+    if (!resId || !passId || !seat) return;
+    this.resSvc.setSeat(resId, passId, seat).subscribe({
+      next: () => {
+        const s2 = [...this.passengerStates()];
+        s2[i] = { ...s2[i], passenger: { ...s2[i].passenger, seatNumber: seat } as any, seatInput: '' };
+        this.passengerStates.set(s2);
+      },
+      error: err => alert(err?.error?.error?.message ?? 'Error al asignar asiento'),
     });
   }
 

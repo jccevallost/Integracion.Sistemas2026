@@ -71,7 +71,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4200',
-  'http://localhost:3000',
+  'https://integracion-sistemas2026.onrender.com',
   'https://mango-meadow-0d3fdd810.7.azurestaticapps.net',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
@@ -151,7 +151,7 @@ app.get('/', (_req, res) => {
 
 // Auth & Users
 app.use('/api/v1/auth',         createAuthRouter(authController));
-app.use('/api/v1/reservations', createReservationRouter(reservationController));
+app.use('/api/v1/reservations', createReservationRouter(reservationController, prisma));
 app.use('/api/v1/promotions',   createPromotionRouter(promotionController));
 
 // Catálogos geográficos (GET público, mutaciones admin)
@@ -189,7 +189,7 @@ app.use('/api/v1/admin', createAdminRouter(adminController, prisma));
 // ── Alias sin versión (backward compatibility) ───────────────
 app.use('/api/auth',                  createAuthRouter(authController));
 app.use('/api/flights',               createFlightRouter(flightController));
-app.use('/api/reservations',          createReservationRouter(reservationController));
+app.use('/api/reservations',          createReservationRouter(reservationController, prisma));
 app.use('/api/promotions',            createPromotionRouter(promotionController));
 app.use('/api/admin',                 createAdminRouter(adminController, prisma));
 
