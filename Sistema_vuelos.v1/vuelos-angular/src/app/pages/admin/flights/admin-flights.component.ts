@@ -5,14 +5,15 @@ import { AdminTableComponent } from '../../../shared/components/admin-table/admi
 import { AdminFormModalComponent } from '../../../shared/components/admin-form-modal/admin-form-modal.component';
 import { AdminService } from '../../../core/services/admin.service';
 
-type Row = { id: string; originAirportIata: string; destinationAirportIata: string; departureDate: string; status: string };
+type Row = { id: string; originAirportIata: string; destinationAirportIata: string; departureDate: string; status: string; flightNumber?: string; airline?: { id: string; name: string; iataCode: string } };
 const empty = (): Partial<Row> => ({ originAirportIata: '', destinationAirportIata: '', departureDate: '', status: 'SCHEDULED' });
 const toDateInput = (iso: string) => iso ? iso.slice(0, 10) : '';
+const STATUS_LABELS: Record<string, string> = { SCHEDULED: 'Programado', DELAYED: 'Retrasado', CANCELLED: 'Cancelado', COMPLETED: 'Completado' };
 
 @Component({ selector: 'app-admin-flights', standalone: true, imports: [CommonModule, FormsModule, AdminTableComponent, AdminFormModalComponent],
   template: `
     <app-admin-table title="Vuelos" [data]="rows()" [columns]="cols" [isLoading]="loading()" [isDeleting]="saving()"
-      [searchKeys]="['originAirportIata','destinationAirportIata','status']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
+      [searchKeys]="['originAirportIata','destinationAirportIata','status','flightNumber']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
     <app-admin-form-modal [title]="form().id ? 'Editar Vuelo' : 'Nuevo Vuelo'" [open]="modal()" [isLoading]="saving()"
       (onClose)="modal.set(false)" (onSubmit)="save($event)">
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Origen IATA *</label>
@@ -36,8 +37,10 @@ export class AdminFlightsComponent implements OnInit {
   modal = signal(false); form = signal<Partial<Row>>(empty());
   cols = [
     { key: 'route', label: 'Ruta', render: (r: Row) => `${r.originAirportIata ?? '?'} → ${r.destinationAirportIata ?? '?'}` },
+    { key: 'airline', label: 'Aerolínea', render: (r: Row) => r.airline ? `${r.airline.name} (${r.airline.iataCode})` : '—' },
+    { key: 'flightNumber', label: 'N° Vuelo', render: (r: Row) => r.flightNumber ?? '—' },
     { key: 'departureDate', label: 'Fecha', render: (r: Row) => r.departureDate ? new Date(r.departureDate).toLocaleDateString('es-EC') : '—' },
-    { key: 'status', label: 'Estado', render: (r: Row) => r.status },
+    { key: 'status', label: 'Estado', render: (r: Row) => STATUS_LABELS[r.status] ?? r.status },
   ];
   ngOnInit() { this.load(); }
   load() { this.svc.getFlights().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
