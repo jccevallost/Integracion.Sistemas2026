@@ -2,15 +2,17 @@
 import { Router } from 'express';
 import { InvoiceItemController } from '../controllers/InvoiceItemController.js';
 import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
+import { validate } from '../../../shared/middlewares/validate.middleware.js';
+import { CreateInvoiceItemSchema, UpdateInvoiceItemSchema } from '../../../shared/schemas/validation.schemas.js';
 
 export function createInvoiceItemRouter(controller: InvoiceItemController): Router {
   const router = Router();
   router.get('/',                        authenticate, requireAdmin, controller.list);
   router.get('/by-invoice/:invoiceId',   authenticate, controller.listByInvoice);
   router.get('/:id',                     authenticate, controller.getById);
-  router.post('/',                       authenticate, requireAdmin, controller.create);
-  router.put('/:id',                     authenticate, requireAdmin, controller.update);
-  router.patch('/:id',                   authenticate, requireAdmin, controller.update);
+  router.post('/',                       authenticate, requireAdmin, validate(CreateInvoiceItemSchema), controller.create);
+  router.put('/:id',                     authenticate, requireAdmin, validate(UpdateInvoiceItemSchema), controller.update);
+  router.patch('/:id',                   authenticate, requireAdmin, validate(UpdateInvoiceItemSchema), controller.update);
   router.delete('/:id',                  authenticate, requireAdmin, controller.remove);
   return router;
 }

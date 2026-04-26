@@ -165,7 +165,13 @@ export const UpdateFlightClassSchema = z.object({
 });
 
 // ── Segments ─────────────────────────────────────────────────────────────────
-export const CreateSegmentSchema = CreateSegmentInlineSchema.extend({ flightId: uuid.optional().nullable() });
+export const CreateSegmentSchema = CreateSegmentInlineSchema
+  .extend({ flightId: uuid.optional().nullable() })
+  .refine(
+    d => new Date(d.departureDateTime) < new Date(d.arrivalDateTime),
+    { message: 'La salida debe ser anterior a la llegada', path: ['arrivalDateTime'] },
+  );
+
 export const UpdateSegmentSchema = z.object({
   segmentNumber:        z.string().optional(),
   originAirportId:      uuid.optional(),
@@ -176,7 +182,15 @@ export const UpdateSegmentSchema = z.object({
   aircraftId:           uuid.optional().nullable(),
   estimatedDuration:    z.number().int().positive().optional(),
   flightId:             uuid.optional().nullable(),
-});
+}).refine(
+  d => {
+    if (d.departureDateTime && d.arrivalDateTime) {
+      return new Date(d.departureDateTime) < new Date(d.arrivalDateTime);
+    }
+    return true;
+  },
+  { message: 'La salida debe ser anterior a la llegada', path: ['arrivalDateTime'] },
+);
 
 // ── Reservations ─────────────────────────────────────────────────────────────
 const PassengerSchema = z.object({
@@ -226,6 +240,14 @@ export const CreateInvoiceItemSchema = z.object({
   totalPrice:  z.number().nonnegative({ message: 'totalPrice no puede ser negativo' }),
 });
 
+export const UpdateInvoiceItemSchema = z.object({
+  invoiceId:   uuid.optional(),
+  description: z.string().min(1).optional(),
+  quantity:    z.number().int().positive().optional(),
+  unitPrice:   z.number().nonnegative().optional(),
+  totalPrice:  z.number().nonnegative().optional(),
+});
+
 // ── Boarding Passes ───────────────────────────────────────────────────────────
 export const CreateBoardingPassSchema = z.object({
   passengerId:   uuid,
@@ -264,6 +286,14 @@ export const CreatePromotionSchema = z.object({
     errorMap: () => ({ message: "discountType debe ser PERCENTAGE o FIXED_AMOUNT" }),
   }),
   discountValue: z.number().positive({ message: 'discountValue debe ser mayor a 0' }),
+  isActive:      z.boolean().optional(),
+  maxUsages:     z.number().int().positive().optional().nullable(),
+});
+
+export const UpdatePromotionSchema = z.object({
+  code:          z.string().min(1).optional(),
+  discountType:  z.enum(['PERCENTAGE','FIXED_AMOUNT']).optional(),
+  discountValue: z.number().positive().optional(),
   isActive:      z.boolean().optional(),
   maxUsages:     z.number().int().positive().optional().nullable(),
 });

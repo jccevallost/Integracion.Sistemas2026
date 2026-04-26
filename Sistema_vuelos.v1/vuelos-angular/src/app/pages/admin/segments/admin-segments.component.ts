@@ -19,7 +19,8 @@ const toISO = (dt: string) => { if (!dt) return dt; const d = new Date(dt); retu
     <app-admin-table title="Segmentos" [data]="rows()" [columns]="cols" [isLoading]="loading()" [isDeleting]="saving()"
       [searchKeys]="['segmentNumber']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
     <app-admin-form-modal [title]="form().id ? 'Editar Segmento' : 'Nuevo Segmento'" [open]="modal()" [isLoading]="saving()"
-      (onClose)="modal.set(false)" (onSubmit)="save($event)">
+      (onClose)="modal.set(false); errorMsg = ''" (onSubmit)="save($event)">
+      <div *ngIf="errorMsg" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{{ errorMsg }}</div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Número de Segmento *</label>
         <input [(ngModel)]="form().segmentNumber" required placeholder="AV101" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase" /></div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Vuelo</label>
@@ -80,14 +81,27 @@ export class AdminSegmentsComponent implements OnInit {
   load() { this.svc.getSegments().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   openCreate() { this.form.set(empty()); this.modal.set(true); }
   openEdit(r: Row) { this.form.set({ ...r, departureDateTime: toLocalInput(r.departureDateTime), arrivalDateTime: toLocalInput(r.arrivalDateTime) }); this.modal.set(true); }
+  errorMsg = '';
   save(e: Event) {
-    e.preventDefault(); this.saving.set(true);
+    e.preventDefault();
     const f = this.form() as any;
+    const dep = new Date(f.departureDateTime);
+    const arr = new Date(f.arrivalDateTime);
+    if (f.departureDateTime && f.arrivalDateTime && dep >= arr) {
+      this.errorMsg = 'La salida debe ser anterior a la llegada.';
+      return;
+    }
+    if (f.originAirportId && f.originAirportId === f.destinationAirportId) {
+      this.errorMsg = 'Origen y destino no pueden ser el mismo aeropuerto.';
+      return;
+    }
+    this.errorMsg = '';
+    this.saving.set(true);
     const body: any = { segmentNumber: f.segmentNumber, originAirportId: f.originAirportId, destinationAirportId: f.destinationAirportId, departureDateTime: toISO(f.departureDateTime), arrivalDateTime: toISO(f.arrivalDateTime), airlineId: f.airlineId, estimatedDuration: Number(f.estimatedDuration) };
     if (f.flightId) body.flightId = f.flightId;
     if (f.aircraftId) body.aircraftId = f.aircraftId;
     const obs = f.id ? this.svc.updateSegment(f.id, body) : this.svc.createSegment(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { console.error('Error segmento:', err); this.saving.set(false); } });
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { this.errorMsg = err?.error?.error?.message ?? 'Error al guardar segmento'; this.saving.set(false); } });
   }
   del(id: string) { this.svc.deleteSegment(id).subscribe(() => this.load()); }
 }

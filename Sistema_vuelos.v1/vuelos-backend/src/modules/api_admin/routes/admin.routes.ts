@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { AdminController } from '../controllers/AdminController.js';
 import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
 import { validate } from '../../../shared/middlewares/validate.middleware.js';
-import { CreateFlightClassSchema, UpdateFlightClassSchema } from '../../../shared/schemas/validation.schemas.js';
+import { CreateFlightClassSchema, UpdateFlightClassSchema, CreateSegmentSchema, UpdateSegmentSchema } from '../../../shared/schemas/validation.schemas.js';
 import type { ZodSchema } from 'zod';
 import type { PrismaClient } from '@prisma/client';
 
@@ -172,7 +172,7 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
     destinationAirport: true,
     airline: true,
     aircraft: true,
-  }));
+  }, { create: CreateSegmentSchema, update: UpdateSegmentSchema }));
 
   // ── Reservas y pasajeros ────────────────────────────────────
   router.use('/reservations', ...auth, makeGenericRouter(db, 'reservation', {

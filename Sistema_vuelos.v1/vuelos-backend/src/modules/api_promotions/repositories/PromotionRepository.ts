@@ -31,6 +31,13 @@ export class PromotionRepository implements IPromotionRepository {
     });
   }
 
+  async decrementUsage(id: string): Promise<void> {
+    await this.db.promotion.update({
+      where: { id },
+      data: { currentUsages: { decrement: 1 } },
+    });
+  }
+
   async create(data: any): Promise<Promotion> {
     return this.db.promotion.create({ data }) as any;
   }

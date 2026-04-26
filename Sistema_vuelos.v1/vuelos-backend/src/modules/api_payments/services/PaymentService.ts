@@ -1,4 +1,5 @@
 // application/services/PaymentService.ts
+import { randomBytes } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import { IPaymentService } from '../interfaces/IPaymentService.js';
 import { IPaymentRepository } from '../interfaces/IPaymentRepository.js';
@@ -58,7 +59,7 @@ export class PaymentService implements IPaymentService {
     const taxAmount= +(total - subtotal).toFixed(2);
     const now      = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-    const invoiceNumber = `INV-${datePart}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const invoiceNumber = `INV-${datePart}-${randomBytes(4).toString('hex').toUpperCase()}`;
 
     await this.invoiceRepo.create({
       paymentId:        payment.id,

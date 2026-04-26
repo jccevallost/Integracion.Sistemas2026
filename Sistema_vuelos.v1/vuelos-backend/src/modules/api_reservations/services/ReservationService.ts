@@ -92,14 +92,19 @@ export class ReservationService implements IReservationService {
       throw new ValidationException('No se puede cancelar una reserva completada');
     }
 
-    const passengers = (reservation as any).passengers ?? [];
+    const passengers    = (reservation as any).passengers ?? [];
     const flightClassId = passengers[0]?.flightClassId ?? null;
     const passengerCount = passengers.length;
+    const promotionId   = (reservation as any).promotionId ?? null;
 
     if (flightClassId && passengerCount > 0) {
       await this.reservationRepository.cancelAndRestoreSeats(id, flightClassId, passengerCount);
     } else {
       await this.reservationRepository.updateStatus(id, 'CANCELLED');
+    }
+
+    if (promotionId) {
+      await this.promotionRepository.decrementUsage(promotionId);
     }
 
     return { cancelled: true, reservationCode: reservation.reservationCode };

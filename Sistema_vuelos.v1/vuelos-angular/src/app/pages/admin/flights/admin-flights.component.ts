@@ -15,7 +15,8 @@ const STATUS_LABELS: Record<string, string> = { SCHEDULED: 'Programado', DELAYED
     <app-admin-table title="Vuelos" [data]="rows()" [columns]="cols" [isLoading]="loading()" [isDeleting]="saving()"
       [searchKeys]="['originAirportIata','destinationAirportIata','status','flightNumber']" (onAdd)="openCreate()" (onEdit)="openEdit($event)" (onDelete)="del($event)"/>
     <app-admin-form-modal [title]="form().id ? 'Editar Vuelo' : 'Nuevo Vuelo'" [open]="modal()" [isLoading]="saving()"
-      (onClose)="modal.set(false)" (onSubmit)="save($event)">
+      (onClose)="modal.set(false); errorMsg = ''" (onSubmit)="save($event)">
+      <div *ngIf="errorMsg" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{{ errorMsg }}</div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Origen IATA *</label>
         <input [(ngModel)]="form().originAirportIata" required maxlength="3" placeholder="UIO" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase" /></div>
       <div><label class="block text-sm font-medium text-gray-700 mb-1">Destino IATA *</label>
@@ -42,16 +43,25 @@ export class AdminFlightsComponent implements OnInit {
     { key: 'departureDate', label: 'Fecha', render: (r: Row) => r.departureDate ? new Date(r.departureDate).toLocaleDateString('es-EC') : '—' },
     { key: 'status', label: 'Estado', render: (r: Row) => STATUS_LABELS[r.status] ?? r.status },
   ];
+  errorMsg = '';
   ngOnInit() { this.load(); }
   load() { this.svc.getFlights().subscribe({ next: (d: any) => { this.rows.set(d); this.loading.set(false); }, error: () => this.loading.set(false) }); }
-  openCreate() { this.form.set(empty()); this.modal.set(true); }
-  openEdit(r: Row) { this.form.set({ ...r, departureDate: toDateInput(r.departureDate) }); this.modal.set(true); }
+  openCreate() { this.form.set(empty()); this.errorMsg = ''; this.modal.set(true); }
+  openEdit(r: Row) { this.form.set({ ...r, departureDate: toDateInput(r.departureDate) }); this.errorMsg = ''; this.modal.set(true); }
   save(e: Event) {
-    e.preventDefault(); this.saving.set(true);
+    e.preventDefault();
     const f = this.form() as any;
-    const body = { originAirportIata: (f.originAirportIata ?? '').toUpperCase(), destinationAirportIata: (f.destinationAirportIata ?? '').toUpperCase(), departureDate: f.departureDate, status: f.status };
+    const origin = (f.originAirportIata ?? '').toUpperCase();
+    const dest   = (f.destinationAirportIata ?? '').toUpperCase();
+    if (origin && dest && origin === dest) {
+      this.errorMsg = 'Origen y destino no pueden ser el mismo aeropuerto.';
+      return;
+    }
+    this.errorMsg = '';
+    this.saving.set(true);
+    const body = { originAirportIata: origin, destinationAirportIata: dest, departureDate: f.departureDate, status: f.status };
     const obs = f.id ? this.svc.updateFlight(f.id, body) : this.svc.createFlight(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { console.error('Error vuelo:', err); this.saving.set(false); } });
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { this.errorMsg = err?.error?.error?.message ?? 'Error al guardar vuelo'; this.saving.set(false); } });
   }
   del(id: string) { this.svc.deleteFlight(id).subscribe(() => this.load()); }
 }
