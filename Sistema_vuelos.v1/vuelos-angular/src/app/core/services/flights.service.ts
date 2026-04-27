@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import type { ApiSuccess, Flight, FlightSearchParams } from '../models/domain';
 
 const BASE = 'https://integracion-sistemas2026.onrender.com/api/v1';
@@ -9,7 +9,15 @@ export class FlightsService {
   private http = inject(HttpClient);
 
   search(params: FlightSearchParams) {
-    return this.http.get<ApiSuccess<Flight[]>>(`${BASE}/flights/search`, { params: params as any });
+    let httpParams = new HttpParams()
+      .set('origin', params.origin)
+      .set('destination', params.destination)
+      .set('date', params.date)
+      .set('passengers', String(params.passengers));
+
+    if (params.class) httpParams = httpParams.set('class', params.class);
+
+    return this.http.get<ApiSuccess<Flight[]>>(`${BASE}/flights/search`, { params: httpParams });
   }
 
   getAll() {
