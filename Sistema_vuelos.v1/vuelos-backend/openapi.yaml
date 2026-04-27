@@ -16,6 +16,10 @@ info:
     **Integridad de asientos**: la creación de reservas y la cancelación se ejecutan en
     transacciones Prisma atómicas — se garantiza que `availableSeats` nunca queda
     inconsistente aunque haya concurrencia.
+
+    **Integracion futura**: gRPC, GraphQL, SOA, mensajeria y eventos se documentan como
+    evolucion arquitectonica. No se declaran endpoints conceptuales en OpenAPI hasta que
+    exista implementacion productiva, para mantener pruebas REST y frontend sin errores.
   version: 1.1.0
   contact:
     name: Equipo Vuelos
@@ -474,6 +478,28 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión
+      description: Invalida el token actual incrementando tokenVersion en BD. El frontend debe eliminar el token almacenado.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Sesión cerrada correctamente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message: { type: string, example: Sesión cerrada correctamente }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ── FLIGHTS ─────────────────────────────────────────────────

@@ -131,6 +131,31 @@
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ValidationErrorResponse' }
+ *
+ * /auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Cerrar sesión (invalida el token actual)
+ *     description: |
+ *       Incrementa el `tokenVersion` del usuario en la base de datos.
+ *       El token JWT actual queda inválido de inmediato aunque no haya expirado.
+ *       El frontend debe eliminar el token almacenado tras esta llamada.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Sesión cerrada correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message: { type: string, example: Sesión cerrada correctamente }
+ *       401:
+ *         description: Token inválido o expirado
  */
 
 // ════════════════════════════════════════════════════════
