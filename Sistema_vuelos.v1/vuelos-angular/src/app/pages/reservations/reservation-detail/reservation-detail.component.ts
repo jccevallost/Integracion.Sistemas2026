@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ReservationsService } from '../../../core/services/reservations.service';
 import { BoardingPassesService } from '../../../core/services/boarding-passes.service';
 import { PassengerServicesService } from '../../../core/services/passenger-services.service';
@@ -33,9 +33,18 @@ const SERVICE_CAT_LABELS: Record<string, string> = {
 const SEAT_ROWS = [1, 2, 3, 4, 5, 6, 12, 14, 15, 16, 17, 18, 19, 20];
 const SEAT_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const SEAT_OPTIONS = SEAT_ROWS.flatMap(row => SEAT_LETTERS.map(letter => `${row}${letter}`));
+const EXTRA_PAYMENT_METHODS = [
+  { value: 'CARD', label: 'Tarjeta', hint: 'Visa o Mastercard' },
+  { value: 'PAYPAL', label: 'PayPal', hint: 'Cuenta verificada' },
+  { value: 'TRANSFER', label: 'Transferencia', hint: 'Referencia bancaria' },
+];
 
 function generateBoardingCode(passengerId: string) {
   return `BP-${passengerId.slice(0, 4).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+function generateExtraTxId() {
+  return `EXT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
 interface PassengerState {
@@ -54,7 +63,7 @@ interface PassengerState {
 @Component({
   selector: 'app-reservation-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, ReactiveFormsModule],
   template: `
     <div class="max-w-2xl mx-auto px-4 py-8 space-y-5">
       <button (click)="router.navigate(['/my-trips'])" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
@@ -397,14 +406,125 @@ interface PassengerState {
               class="w-full bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
               {{ checkoutOpen() ? 'Ocultar checkout' : 'Continuar checkout de extras' }}
             </button>
-            <div *ngIf="checkoutOpen()" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
-              <p class="font-semibold">Checkout pendiente de pago</p>
-              <p>El frontend ya recalcula los extras. Para cobrarlo como aerolinea real falta permitir pagos parciales o cargos adicionales por reserva en el backend.</p>
-              <div class="grid grid-cols-3 gap-2 pt-1">
-                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">Tarjeta</button>
-                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">PayPal</button>
-                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">Transferencia</button>
+            <div *ngIf="checkoutOpen()" class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700 space-y-4 shadow-sm">
+              <div *ngIf="extrasPaymentRef(); else extrasCheckoutFormTpl" class="rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+                <div class="flex items-start gap-3">
+                  <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <div>
+                    <p class="font-semibold">Pago de extras aprobado</p>
+                    <p class="text-xs mt-1">Comprobante simulado: <span class="font-mono">{{ extrasPaymentRef() }}</span></p>
+                    <p class="text-xs mt-1">Total extras: <strong>\${{ pendingExtrasTotal().toFixed(2) }}</strong></p>
+                  </div>
+                </div>
               </div>
+
+              <ng-template #extrasCheckoutFormTpl>
+                <form [formGroup]="extrasCheckoutForm" (ngSubmit)="submitExtrasCheckout()" class="space-y-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="font-semibold text-gray-900">Checkout de extras</p>
+                      <p class="text-xs text-gray-500 mt-1">Paga servicios y asientos sin modificar el boleto base.</p>
+                    </div>
+                    <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">\${{ pendingExtrasTotal().toFixed(2) }}</span>
+                  </div>
+
+                  <div class="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-2">
+                    <div *ngFor="let item of extraCheckoutItems()" class="flex items-center justify-between gap-3 rounded-lg bg-white border border-gray-100 px-3 py-2">
+                      <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate">{{ item.title }}</p>
+                        <p class="text-xs text-gray-400 truncate">{{ item.subtitle }}</p>
+                      </div>
+                      <span class="text-sm font-bold text-gray-800">\${{ item.amount.toFixed(2) }}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 text-xs text-gray-500">
+                      <div class="flex justify-between"><span>Subtotal</span><span>\${{ extrasSubtotal().toFixed(2) }}</span></div>
+                      <div class="flex justify-between"><span>IVA 15%</span><span>\${{ extrasTaxAmount().toFixed(2) }}</span></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Metodo de pago</p>
+                    <div class="grid grid-cols-3 gap-2">
+                      <label *ngFor="let method of extraPaymentMethods" class="cursor-pointer">
+                        <input type="radio" formControlName="provider" [value]="method.value" class="sr-only peer" />
+                        <div class="h-full rounded-xl border-2 border-gray-200 px-3 py-2 text-center transition-colors peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                          <p class="text-xs font-bold text-gray-800">{{ method.label }}</p>
+                          <p class="text-[10px] text-gray-400 mt-0.5">{{ method.hint }}</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Nombre / razon social</label>
+                      <input formControlName="payerName" placeholder="Juan Cevallos"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">RUC / cedula</label>
+                      <input formControlName="taxId" placeholder="0912345678"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Correo de comprobante</label>
+                      <input formControlName="email" type="email" placeholder="cliente@email.com"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Direccion de facturacion</label>
+                      <input formControlName="billingAddress" placeholder="Av. Principal y Calle 10"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                  </div>
+
+                  <div *ngIf="extrasCheckoutForm.value.provider === 'CARD'" class="rounded-xl border border-blue-100 bg-blue-50 p-3 space-y-3">
+                    <div class="grid grid-cols-3 gap-2">
+                      <label *ngFor="let brand of ['VISA', 'MASTERCARD', 'AMEX']" class="cursor-pointer">
+                        <input type="radio" formControlName="cardBrand" [value]="brand" class="sr-only peer" />
+                        <div class="rounded-lg border border-blue-100 bg-white py-2 text-center text-xs font-bold text-gray-600 peer-checked:border-blue-500 peer-checked:text-blue-700">{{ brand }}</div>
+                      </label>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Nombre en tarjeta</label>
+                      <input formControlName="cardholderName" placeholder="JUAN CEVALLOS"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none uppercase" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Numero de tarjeta</label>
+                      <input formControlName="cardNumber" [value]="extrasCardDisplay" (input)="onExtrasCardInput($event)" placeholder="4111 1111 1111 1111"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <input formControlName="expiry" placeholder="MM/AA" maxlength="5" (input)="onExtrasExpiryInput($event)"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input formControlName="cvv" type="password" placeholder="CVV" maxlength="4"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                  </div>
+
+                  <div *ngIf="extrasCheckoutForm.value.provider === 'PAYPAL'" class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Correo PayPal</label>
+                    <input formControlName="paypalEmail" type="email" placeholder="paypal@email.com"
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+
+                  <div *ngIf="extrasCheckoutForm.value.provider === 'TRANSFER'" class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Referencia bancaria</label>
+                    <input formControlName="bankReference" placeholder="TRF-2026-000123"
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none uppercase" />
+                  </div>
+
+                  <p *ngIf="extrasCheckoutError()" class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{{ extrasCheckoutError() }}</p>
+
+                  <button type="submit" [disabled]="extrasPayLoading()"
+                    class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-semibold py-3 rounded-lg transition-colors">
+                    <svg *ngIf="extrasPayLoading()" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    {{ extrasPayLoading() ? 'Procesando extras...' : 'Pagar extras ahora' }}
+                  </button>
+                  <p class="text-[11px] text-gray-400 text-center">Simulacion local hasta habilitar cargos parciales en backend.</p>
+                </form>
+              </ng-template>
             </div>
           </div>
         </div>
@@ -428,6 +548,7 @@ export class ReservationDetailComponent implements OnInit {
   private ascSvc     = inject(AirlineServiceConfigsService);
   private paymentSvc = inject(PaymentsService);
   private invoiceSvc = inject(InvoicesService);
+  private fb         = inject(FormBuilder);
 
   loading         = signal(true);
   cancelling      = signal(false);
@@ -437,11 +558,30 @@ export class ReservationDetailComponent implements OnInit {
   serviceConfigsLoading = signal(false);
   serviceConfigsError   = signal('');
   checkoutOpen          = signal(false);
+  extrasPayLoading      = signal(false);
+  extrasCheckoutError   = signal('');
+  extrasPaymentRef      = signal('');
   payment         = signal<Payment | null>(null);
   invoice         = signal<Invoice | null>(null);
   seatRows = SEAT_ROWS;
   leftSeatLetters = SEAT_LETTERS.slice(0, 3);
   rightSeatLetters = SEAT_LETTERS.slice(3);
+  extraPaymentMethods = EXTRA_PAYMENT_METHODS;
+  extrasCardDisplay = '';
+  extrasCheckoutForm = this.fb.group({
+    provider: ['CARD', Validators.required],
+    cardBrand: ['VISA'],
+    cardholderName: [''],
+    cardNumber: [''],
+    expiry: [''],
+    cvv: [''],
+    payerName: ['', Validators.required],
+    taxId: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    billingAddress: ['', Validators.required],
+    paypalEmail: [''],
+    bankReference: [''],
+  });
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -600,6 +740,7 @@ export class ReservationDetailComponent implements OnInit {
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], passengerServices: [...s2[i].passengerServices, r.data], addingService: false, selectedConfig: '' };
         this.passengerStates.set(s2);
+        this.extrasPaymentRef.set('');
         this.checkoutOpen.set(true);
       },
       error: err => alert(err?.error?.error?.message ?? 'Error al agregar servicio'),
@@ -612,6 +753,7 @@ export class ReservationDetailComponent implements OnInit {
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], passengerServices: s2[i].passengerServices.filter(s => s.id !== svcId) };
         this.passengerStates.set(s2);
+        this.extrasPaymentRef.set('');
         if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
       },
     });
@@ -683,12 +825,14 @@ export class ReservationDetailComponent implements OnInit {
 
   selectSeat(i: number, seat: string) {
     this.updatePS(i, { seatInput: seat });
+    this.extrasPaymentRef.set('');
     if (this.seatPrice(seat) > 0) this.checkoutOpen.set(true);
     if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
   }
 
   autoAssignSeat(i: number) {
     this.updatePS(i, { seatInput: this.autoSeatForIndex(i) });
+    this.extrasPaymentRef.set('');
     if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
   }
 
@@ -723,6 +867,101 @@ export class ReservationDetailComponent implements OnInit {
 
   toggleCheckout() {
     this.checkoutOpen.update(v => !v);
+  }
+
+  extraCheckoutItems() {
+    const items: { title: string; subtitle: string; amount: number }[] = [];
+    this.passengerStates().forEach(ps => {
+      const passengerName = `${ps.passenger.firstName} ${ps.passenger.lastName}`.trim();
+      ps.passengerServices.forEach(svc => {
+        const quantity = Number(svc.quantity ?? 1);
+        const unit = Number(svc.unitPriceAtBooking ?? 0);
+        items.push({
+          title: svc.serviceConfig?.service?.name ?? 'Servicio adicional',
+          subtitle: `${passengerName || 'Pasajero'} - ${this.catLabel(svc.serviceConfig?.service?.category)} x${quantity}`,
+          amount: quantity * unit,
+        });
+      });
+
+      const activeSeat = ps.passenger.seatNumber || ps.seatInput;
+      const seatAmount = this.seatPrice(activeSeat);
+      if (activeSeat && seatAmount > 0) {
+        items.push({
+          title: `Asiento ${activeSeat}`,
+          subtitle: `${passengerName || 'Pasajero'} - ${this.seatLabel(activeSeat)}`,
+          amount: seatAmount,
+        });
+      }
+    });
+    return items;
+  }
+
+  extrasSubtotal() {
+    return +(this.pendingExtrasTotal() / 1.15).toFixed(2);
+  }
+
+  extrasTaxAmount() {
+    return +(this.pendingExtrasTotal() - this.extrasSubtotal()).toFixed(2);
+  }
+
+  onExtrasCardInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const formatted = input.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+    this.extrasCardDisplay = formatted;
+    this.extrasCheckoutForm.get('cardNumber')!.setValue(formatted);
+  }
+
+  onExtrasExpiryInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    let value = input.value.replace(/\D/g, '').slice(0, 4);
+    if (value.length >= 3) value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    input.value = value;
+    this.extrasCheckoutForm.get('expiry')!.setValue(value);
+  }
+
+  submitExtrasCheckout() {
+    this.extrasCheckoutError.set('');
+    this.extrasPaymentRef.set('');
+    if (this.pendingExtrasTotal() <= 0) return;
+    if (this.extrasCheckoutForm.invalid) {
+      this.extrasCheckoutForm.markAllAsTouched();
+      this.extrasCheckoutError.set('Completa los datos de facturacion.');
+      return;
+    }
+
+    const provider = this.extrasCheckoutForm.value.provider;
+    if (provider === 'CARD') {
+      const card = this.extrasCheckoutForm.value.cardNumber ?? '';
+      const expiry = this.extrasCheckoutForm.value.expiry ?? '';
+      const cvv = this.extrasCheckoutForm.value.cvv ?? '';
+      const holder = this.extrasCheckoutForm.value.cardholderName ?? '';
+      if (!holder.trim() || !/^[\d\s]{19}$/.test(card) || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry) || !/^\d{3,4}$/.test(cvv)) {
+        this.extrasCheckoutError.set('Revisa los datos de la tarjeta.');
+        return;
+      }
+    }
+
+    if (provider === 'PAYPAL') {
+      const paypalEmail = this.extrasCheckoutForm.value.paypalEmail ?? '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail)) {
+        this.extrasCheckoutError.set('Ingresa un correo PayPal valido.');
+        return;
+      }
+    }
+
+    if (provider === 'TRANSFER') {
+      const bankReference = this.extrasCheckoutForm.value.bankReference ?? '';
+      if (bankReference.trim().length < 6) {
+        this.extrasCheckoutError.set('Ingresa una referencia bancaria valida.');
+        return;
+      }
+    }
+
+    this.extrasPayLoading.set(true);
+    setTimeout(() => {
+      this.extrasPayLoading.set(false);
+      this.extrasPaymentRef.set(generateExtraTxId());
+    }, 900);
   }
 
   createdDate(r: Reservation) {
