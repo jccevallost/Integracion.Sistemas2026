@@ -1,38 +1,33 @@
 openapi: 3.0.3
 
-# ============================================================
-#   Contrato formal de la API de Vuelos — versión 1.0.0
-#   Sección 1.4 teoría: contratos OpenAPI como base de integración
-#
-#   Este archivo ES la fuente de verdad del sistema.
-#   - El frontend React lo consume para saber qué esperar
-#   - En Reto 2 el API Gateway lo usa para routing
-#   - En Reto 3 React Native lo consume sin cambios
-# ============================================================
-
 info:
   title: Vuelos API
   description: |
     API REST para el módulo de vuelos de la plataforma Booking académica.
 
     **Versionamiento**: todas las rutas usan el prefijo `/api/v1/`.
-    En Reto 2 se agrega `/api/v2/` sin deprecar `/api/v1/`.
 
     **Autenticación**: Bearer JWT en el header `Authorization`.
     Obtener el token con `POST /api/v1/auth/login`.
-  version: 1.0.0
+
+    **Validación**: todos los endpoints mutantes (POST/PUT/PATCH) validan el cuerpo con
+    Zod antes de ejecutar lógica de negocio. Errores de validación retornan HTTP 400.
+
+    **Integridad de asientos**: la creación de reservas y la cancelación se ejecutan en
+    transacciones Prisma atómicas — se garantiza que `availableSeats` nunca queda
+    inconsistente aunque haya concurrencia.
+  version: 1.1.0
   contact:
     name: Equipo Vuelos
 
 servers:
+  - url: https://integracion-sistemas2026.onrender.com/api/v1
+    description: Producción (Render)
   - url: http://localhost:3000/api/v1
     description: Desarrollo local
-  - url: https://vuelos-api.onrender.com/api/v1
-    description: Producción (Render)
 
 # ============================================================
 #   SEGURIDAD GLOBAL
-#   Sección 1.1 teoría: seguridad by design
 # ============================================================
 components:
   securitySchemes:
@@ -42,43 +37,33 @@ components:
       bearerFormat: JWT
       description: Token JWT obtenido en POST /auth/login
 
-  # ── Schemas reutilizables (sección 1.4: components/schemas) ──
   schemas:
 
-    # ── Envelopes de respuesta ──────────────────────────────
+    # ── Envelopes ───────────────────────────────────────────────
     SuccessResponse:
       type: object
       required: [success, data]
       properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: object
+        success: { type: boolean, example: true }
+        data:    { type: object }
 
     ErrorResponse:
       type: object
       required: [success, error]
       properties:
-        success:
-          type: boolean
-          example: false
+        success: { type: boolean, example: false }
         error:
           type: object
           required: [code, message]
           properties:
-            code:
-              type: string
-              example: NOT_FOUND
-            message:
-              type: string
-              example: Recurso no encontrado
+            code:    { type: string, example: VALIDATION }
+            message: { type: string, example: Descripción del error }
 
-    # ── Entidades de dominio ────────────────────────────────
+    # ── Entidades ────────────────────────────────────────────────
     User:
       type: object
       properties:
-        id:             { type: string, example: clx1234 }
+        id:             { type: string, example: clx1abc }
         email:          { type: string, format: email }
         firstName:      { type: string, example: Juan }
         secondName:     { type: string, nullable: true }
@@ -92,17 +77,31 @@ components:
         isActive:       { type: boolean }
         createdAt:      { type: string, format: date-time }
 
+    Country:
+      type: object
+      properties:
+        id:           { type: string }
+        name:         { type: string, example: Ecuador }
+        isoCode:      { type: string, example: EC, minLength: 2, maxLength: 3 }
+        phoneCode:    { type: string, nullable: true }
+        currencyCode: { type: string, nullable: true }
+
+    City:
+      type: object
+      properties:
+        id:       { type: string }
+        name:     { type: string, example: Quito }
+        iataCode: { type: string, nullable: true, example: UIO }
+        country:  { $ref: '#/components/schemas/Country' }
+
     Airport:
       type: object
       properties:
-        id:        { type: string }
-        iataCode:  { type: string, example: UIO }
-        name:      { type: string, example: Aeropuerto Mariscal Sucre }
-        city:      { type: string, example: Quito }
-        country:   { type: string, example: Ecuador }
-        timezone:  { type: string, example: America/Guayaquil }
-        latitude:  { type: number, nullable: true }
-        longitude: { type: number, nullable: true }
+        id:       { type: string }
+        iataCode: { type: string, example: UIO }
+        name:     { type: string, example: Aeropuerto Mariscal Sucre }
+        timezone: { type: string, example: America/Guayaquil }
+        city:     { $ref: '#/components/schemas/City' }
 
     Airline:
       type: object
@@ -111,19 +110,34 @@ components:
         iataCode:  { type: string, example: AV }
         name:      { type: string, example: Avianca }
         logoUrl:   { type: string, nullable: true }
-        countryId: { type: string }
-        country:
-          nullable: true
-          $ref: '#/components/schemas/Country'
+        country:   { $ref: '#/components/schemas/Country' }
 
-    Country:
+    Aircraft:
       type: object
       properties:
         id:           { type: string }
-        name:         { type: string, example: Ecuador }
-        isoCode:      { type: string, example: EC }
-        phoneCode:    { type: string, nullable: true }
-        currencyCode: { type: string, nullable: true }
+        modelName:    { type: string, example: Boeing 737-800 }
+        registration: { type: string, example: HC-CJK }
+        hasWifi:      { type: boolean }
+        hasUsb:       { type: boolean }
+        airline:      { $ref: '#/components/schemas/Airline' }
+
+    Segment:
+      type: object
+      properties:
+        id:                  { type: string }
+        segmentNumber:       { type: string, example: AV101 }
+        flightId:            { type: string, nullable: true }
+        originAirportId:     { type: string }
+        destinationAirportId: { type: string }
+        departureDateTime:   { type: string, format: date-time, example: '2025-06-15T08:30:00Z' }
+        arrivalDateTime:     { type: string, format: date-time, example: '2025-06-15T10:15:00Z' }
+        airlineId:           { type: string }
+        aircraftId:          { type: string, nullable: true }
+        estimatedDuration:   { type: integer, description: Duración en minutos, example: 105 }
+        originAirport:       { $ref: '#/components/schemas/Airport' }
+        destinationAirport:  { $ref: '#/components/schemas/Airport' }
+        airline:             { $ref: '#/components/schemas/Airline' }
 
     FlightClass:
       type: object
@@ -131,9 +145,11 @@ components:
         id:             { type: string }
         flightId:       { type: string }
         cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
-        classType:      { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST], description: "Alias de cabinClass (calculado por el mapper)" }
-        availableSeats: { type: integer }
+        availableSeats: { type: integer, minimum: 0 }
         basePrice:      { type: number, format: decimal, example: 89.00 }
+        flight:
+          nullable: true
+          $ref: '#/components/schemas/Flight'
 
     Flight:
       type: object
@@ -141,43 +157,19 @@ components:
         id:                     { type: string }
         originAirportIata:      { type: string, example: UIO }
         destinationAirportIata: { type: string, example: BOG }
-        departureDate:          { type: string, format: date-time }
-        status:
-          type: string
-          enum: [SCHEDULED, DELAYED, CANCELLED, COMPLETED]
-        duration:    { type: integer, description: Duración total en minutos }
-        stops:       { type: integer }
-        lowestPrice: { type: number, nullable: true }
-        # Campos de conveniencia (calculados por FlightMapper desde segments)
+        departureDate:          { type: string, format: date }
+        status:                 { type: string, enum: [SCHEDULED, DELAYED, CANCELLED, COMPLETED] }
+        # Campos calculados por FlightMapper a partir de segmentos
         flightNumber:      { type: string, nullable: true }
         departureDateTime: { type: string, format: date-time, nullable: true }
         arrivalDateTime:   { type: string, format: date-time, nullable: true }
-        aircraft:          { type: string, nullable: true }
-        airline:
-          nullable: true
-          $ref: '#/components/schemas/Airline'
-        route:
-          type: object
-          properties:
-            estimatedDuration: { type: integer }
-            originAirport:
-              type: object
-              properties:
-                id:       { type: string, nullable: true }
-                iataCode: { type: string }
-                name:     { type: string }
-                city:     { type: string }
-                country:  { type: string }
-                timezone: { type: string }
-            destinationAirport:
-              type: object
-              properties:
-                id:       { type: string, nullable: true }
-                iataCode: { type: string }
-                name:     { type: string }
-                city:     { type: string }
-                country:  { type: string }
-                timezone: { type: string }
+        duration:          { type: integer, description: Duración total en minutos, nullable: true }
+        stops:             { type: integer, nullable: true }
+        lowestPrice:       { type: number, nullable: true }
+        airline:           { nullable: true, $ref: '#/components/schemas/Airline' }
+        segments:
+          type: array
+          items: { $ref: '#/components/schemas/Segment' }
         flightClasses:
           type: array
           items: { $ref: '#/components/schemas/FlightClass' }
@@ -187,29 +179,11 @@ components:
       required: [firstName, lastName, documentNumber]
       properties:
         id:             { type: string }
-        firstName:      { type: string }
-        lastName:       { type: string }
-        documentNumber: { type: string, example: 1234567890 }
-        seatNumber:     { type: string, nullable: true }
-
-    Reservation:
-      type: object
-      properties:
-        id:              { type: string }
-        reservationCode: { type: string, example: A3F7B2C1 }
-        status:
-          type: string
-          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
-        totalAmount:  { type: number, format: decimal }
-        currency:     { type: string, example: USD }
-        createdAt:    { type: string, format: date-time }
-        flightClass:  { $ref: '#/components/schemas/FlightClass' }
-        passengers:
-          type: array
-          items: { $ref: '#/components/schemas/Passenger' }
-        promotion:
-          nullable: true
-          $ref: '#/components/schemas/Promotion'
+        firstName:      { type: string, example: Juan }
+        lastName:       { type: string, example: Pérez }
+        documentNumber: { type: string, example: '1234567890' }
+        seatNumber:     { type: string, nullable: true, example: 14C }
+        flightClassId:  { type: string }
 
     Promotion:
       type: object
@@ -217,10 +191,139 @@ components:
         id:            { type: string }
         code:          { type: string, example: VERANO25 }
         discountType:  { type: string, enum: [PERCENTAGE, FIXED_AMOUNT] }
-        discountValue: { type: number }
+        discountValue: { type: number, example: 15 }
         maxUsages:     { type: integer, nullable: true }
         currentUsages: { type: integer }
         isActive:      { type: boolean }
+
+    Reservation:
+      type: object
+      properties:
+        id:              { type: string }
+        reservationCode: { type: string, example: A3F7B2C1 }
+        status:          { type: string, enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED] }
+        totalAmount:     { type: number, format: decimal }
+        createdAt:       { type: string, format: date-time }
+        userId:          { type: string }
+        flightId:        { type: string }
+        promotionId:     { type: string, nullable: true }
+        flight:
+          nullable: true
+          $ref: '#/components/schemas/Flight'
+        passengers:
+          type: array
+          items: { $ref: '#/components/schemas/Passenger' }
+        promotion:
+          nullable: true
+          $ref: '#/components/schemas/Promotion'
+        user:
+          nullable: true
+          type: object
+          properties:
+            id:            { type: string }
+            email:         { type: string }
+            firstName:     { type: string }
+            firstLastName: { type: string }
+
+    Payment:
+      type: object
+      properties:
+        id:            { type: string }
+        reservationId: { type: string }
+        amount:        { type: number, format: decimal }
+        provider:      { type: string, example: VISA }
+        transactionId: { type: string }
+        status:        { type: string, enum: [PENDING, COMPLETED, FAILED, REFUNDED] }
+        createdAt:     { type: string, format: date-time }
+
+    BillingProfile:
+      type: object
+      properties:
+        id:           { type: string }
+        userId:       { type: string }
+        taxId:        { type: string, example: '1712345678001' }
+        businessName: { type: string, example: Juan Pérez }
+        email:        { type: string, nullable: true }
+        address:      { type: string }
+        isDefault:    { type: boolean }
+
+    Invoice:
+      type: object
+      properties:
+        id:               { type: string }
+        paymentId:        { type: string }
+        billingProfileId: { type: string }
+        invoiceNumber:    { type: string, example: INV-20250615-3A8F1B2C }
+        subtotal:         { type: number, format: decimal }
+        taxAmount:        { type: number, format: decimal, description: IVA 15% }
+        total:            { type: number, format: decimal }
+        createdAt:        { type: string, format: date-time }
+
+    InvoiceItem:
+      type: object
+      properties:
+        id:          { type: string }
+        invoiceId:   { type: string }
+        description: { type: string, example: 'Boleto UIO-BOG (Pasajero: Juan Pérez)' }
+        quantity:    { type: integer, minimum: 1 }
+        unitPrice:   { type: number, minimum: 0 }
+        totalPrice:  { type: number, minimum: 0 }
+
+    BoardingPass:
+      type: object
+      properties:
+        id:           { type: string }
+        passengerId:  { type: string }
+        segmentId:    { type: string }
+        boardingCode: { type: string, example: BP-A3F7-XK9M }
+        gate:         { type: string, nullable: true }
+        boardingGroup: { type: string, nullable: true }
+        checkInAt:    { type: string, format: date-time, nullable: true }
+        status:       { type: string, enum: [NOT_CHECKED_IN, CHECKED_IN, BOARDED, NO_SHOW] }
+
+    PassengerService:
+      type: object
+      properties:
+        id:                 { type: string }
+        passengerId:        { type: string }
+        serviceConfigId:    { type: string }
+        quantity:           { type: integer, minimum: 1 }
+        unitPriceAtBooking: { type: number, minimum: 0 }
+        serviceConfig:
+          nullable: true
+          type: object
+          properties:
+            id:      { type: string }
+            price:   { type: number }
+            currency: { type: string }
+            service:
+              type: object
+              properties:
+                name:     { type: string }
+                code:     { type: string }
+                category: { type: string, enum: [BAGGAGE, MEAL, SEAT, ENTERTAINMENT, LOUNGE, INSURANCE, TRANSPORT, OTRO] }
+
+    ServiceCatalog:
+      type: object
+      properties:
+        id:          { type: string }
+        name:        { type: string, example: Equipaje adicional }
+        code:        { type: string, example: BAG_EXTRA }
+        category:    { type: string, enum: [BAGGAGE, MEAL, SEAT, ENTERTAINMENT, LOUNGE, INSURANCE, TRANSPORT, OTRO] }
+        description: { type: string, nullable: true }
+
+    AirlineServiceConfig:
+      type: object
+      properties:
+        id:              { type: string }
+        serviceId:       { type: string }
+        airlineId:       { type: string }
+        price:           { type: number, minimum: 0 }
+        currency:        { type: string, example: USD }
+        originAirportId: { type: string, nullable: true }
+        destAirportId:   { type: string, nullable: true }
+        service:         { $ref: '#/components/schemas/ServiceCatalog' }
+        airline:         { $ref: '#/components/schemas/Airline' }
 
   # ── Respuestas reutilizables ────────────────────────────────
   responses:
@@ -240,14 +343,18 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     BadRequest:
-      description: Datos de entrada inválidos
+      description: Datos de entrada inválidos (fallo de validación Zod)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Conflicto de datos (duplicado o restricción de negocio)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
 
 # ============================================================
-#   PATHS — Endpoints del sistema
-#   Sección 1.4 teoría: interfaz uniforme REST
+#   PATHS
 # ============================================================
 paths:
 
@@ -263,17 +370,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, password, firstName, firstLastName]
+              required: [email, password, firstName, firstLastName, mainAddress]
               properties:
-                email:         { type: string, format: email }
-                password:      { type: string, minLength: 6 }
-                firstName:     { type: string }
-                firstLastName: { type: string }
-                secondName:    { type: string }
+                email:          { type: string, format: email }
+                password:       { type: string, minLength: 6 }
+                firstName:      { type: string }
+                firstLastName:  { type: string }
+                secondName:     { type: string }
                 secondLastName: { type: string }
-                mainAddress:   { type: string }
-                phone:         { type: string }
-                birthDate:     { type: string, format: date }
+                mainAddress:    { type: string }
+                cityId:         { type: string, format: uuid }
+                phone:          { type: string }
+                birthDate:      { type: string, format: date-time }
       responses:
         '201':
           description: Usuario registrado
@@ -290,17 +398,12 @@ paths:
                           user:  { $ref: '#/components/schemas/User' }
                           token: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '409':
-          description: Email ya registrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /auth/login:
     post:
       tags: [Auth]
       summary: Iniciar sesión
-      description: Autentica al usuario y devuelve un token JWT con expiración 7d.
       requestBody:
         required: true
         content:
@@ -350,32 +453,6 @@ paths:
                       data: { $ref: '#/components/schemas/User' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  /auth/profile:
-    put:
-      tags: [Auth]
-      summary: Actualizar perfil propio
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                firstName:      { type: string }
-                lastName:       { type: string }
-                phone:          { type: string }
-                nationality:    { type: string }
-                documentType:   { type: string }
-                documentNumber: { type: string }
-                birthDate:      { type: string, format: date }
-      responses:
-        '200':
-          description: Perfil actualizado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
   /auth/change-password:
     post:
       tags: [Auth]
@@ -406,34 +483,13 @@ paths:
       summary: Buscar vuelos disponibles
       description: |
         Retorna vuelos con disponibilidad para la ruta, fecha y número de pasajeros.
-        Integración **síncrona** (sección 1.5 teoría): el cliente espera la respuesta
-        antes de mostrar resultados.
+        Solo devuelve vuelos con `availableSeats >= passengers` en la clase solicitada.
       parameters:
-        - name: origin
-          in: query
-          required: true
-          description: Código IATA del aeropuerto de origen
-          schema: { type: string, example: UIO }
-        - name: destination
-          in: query
-          required: true
-          description: Código IATA del aeropuerto de destino
-          schema: { type: string, example: BOG }
-        - name: date
-          in: query
-          required: true
-          description: Fecha de salida (YYYY-MM-DD)
-          schema: { type: string, format: date, example: '2025-04-01' }
-        - name: passengers
-          in: query
-          required: false
-          description: Número de pasajeros (default 1)
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: class
-          in: query
-          required: false
-          description: Clase tarifaria
-          schema: { type: string, enum: [ECONOMY, BUSINESS, FIRST] }
+        - { name: origin, in: query, required: true, schema: { type: string, example: UIO }, description: Código IATA de 3 letras }
+        - { name: destination, in: query, required: true, schema: { type: string, example: BOG } }
+        - { name: date, in: query, required: true, schema: { type: string, format: date, example: '2025-06-15' } }
+        - { name: passengers, in: query, schema: { type: integer, minimum: 1, maximum: 9, default: 1 } }
+        - { name: class, in: query, schema: { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] } }
       responses:
         '200':
           description: Vuelos disponibles
@@ -447,17 +503,12 @@ paths:
                       data:
                         type: array
                         items: { $ref: '#/components/schemas/Flight' }
-                      meta:
-                        type: object
-                        properties:
-                          total:      { type: integer }
-                          passengers: { type: integer }
         '400': { $ref: '#/components/responses/BadRequest' }
 
   /flights:
     get:
       tags: [Flights]
-      summary: Listar todos los vuelos
+      summary: Listar todos los vuelos (público)
       responses:
         '200':
           description: Lista de vuelos
@@ -475,46 +526,77 @@ paths:
       tags: [Flights]
       summary: Crear vuelo (admin)
       security: [{ bearerAuth: [] }]
+      description: |
+        Valida que `originAirportIata ≠ destinationAirportIata`.
+        Se pueden incluir segmentos y clases de vuelo en el mismo request.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [flightNumber, routeId, airlineId, departureDateTime, arrivalDateTime]
+              required: [originAirportIata, destinationAirportIata, departureDate]
               properties:
-                flightNumber:      { type: string }
-                routeId:           { type: string }
-                airlineId:         { type: string }
-                departureDateTime: { type: string, format: date-time }
-                arrivalDateTime:   { type: string, format: date-time }
-                aircraft:          { type: string }
+                originAirportIata:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  example: UIO
+                destinationAirportIata:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  example: BOG
+                  description: Debe ser diferente al origen
+                departureDate:
+                  type: string
+                  format: date
+                  example: '2025-06-15'
+                status:
+                  type: string
+                  enum: [SCHEDULED, DELAYED, CANCELLED, COMPLETED]
+                  default: SCHEDULED
+                segments:
+                  type: array
+                  items:
+                    type: object
+                    required: [segmentNumber, originAirportId, destinationAirportId, departureDateTime, arrivalDateTime, airlineId, estimatedDuration]
+                    properties:
+                      segmentNumber:        { type: string }
+                      originAirportId:      { type: string, format: uuid }
+                      destinationAirportId: { type: string, format: uuid }
+                      departureDateTime:    { type: string, format: date-time, description: Debe ser anterior a arrivalDateTime }
+                      arrivalDateTime:      { type: string, format: date-time }
+                      airlineId:            { type: string, format: uuid }
+                      aircraftId:           { type: string, format: uuid }
+                      estimatedDuration:    { type: integer, minimum: 1 }
                 flightClasses:
                   type: array
                   items:
                     type: object
-                    required: [classType, totalSeats, availableSeats, basePrice]
+                    required: [cabinClass, availableSeats, basePrice]
                     properties:
-                      classType:        { type: string, enum: [ECONOMY, BUSINESS, FIRST] }
-                      totalSeats:       { type: integer }
-                      availableSeats:   { type: integer }
-                      basePrice:        { type: number }
-                      baggageAllowance: { type: string }
+                      cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+                      availableSeats: { type: integer, minimum: 1 }
+                      basePrice:      { type: number, minimum: 0, exclusiveMinimum: true }
       responses:
         '201':
           description: Vuelo creado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Flight' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /flights/{id}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
+      - { name: id, in: path, required: true, schema: { type: string } }
     get:
       tags: [Flights]
       summary: Detalle de un vuelo
@@ -530,20 +612,32 @@ paths:
                     properties:
                       data: { $ref: '#/components/schemas/Flight' }
         '404': { $ref: '#/components/responses/NotFound' }
-    put:
+    patch:
       tags: [Flights]
       summary: Actualizar vuelo (admin)
       security: [{ bearerAuth: [] }]
       requestBody:
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                originAirportIata:      { type: string, minLength: 3, maxLength: 3 }
+                destinationAirportIata: { type: string, minLength: 3, maxLength: 3 }
+                departureDate:          { type: string, format: date }
+                status:                 { type: string, enum: [SCHEDULED, DELAYED, CANCELLED, COMPLETED] }
       responses:
         '200':
           description: Vuelo actualizado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Flight' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     delete:
@@ -556,6 +650,104 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── FLIGHT CLASSES ───────────────────────────────────────────
+  /flight-classes:
+    get:
+      tags: [FlightClasses]
+      summary: Listar clases de vuelo
+      responses:
+        '200':
+          description: Lista de clases
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/FlightClass' }
+    post:
+      tags: [FlightClasses]
+      summary: Crear clase de vuelo (admin)
+      security: [{ bearerAuth: [] }]
+      description: |
+        Única por combinación `(flightId, cabinClass)` — retorna 409 si ya existe.
+        `availableSeats` mínimo 0; `basePrice` debe ser mayor a 0.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flightId, cabinClass, availableSeats, basePrice]
+              properties:
+                flightId:       { type: string, format: uuid }
+                cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+                availableSeats: { type: integer, minimum: 0 }
+                basePrice:      { type: number, minimum: 0, exclusiveMinimum: true }
+      responses:
+        '201':
+          description: Clase creada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FlightClass' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /flight-classes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [FlightClasses]
+      summary: Detalle de una clase de vuelo
+      responses:
+        '200':
+          description: Clase encontrada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FlightClass' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [FlightClasses]
+      summary: Actualizar clase de vuelo (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+                availableSeats: { type: integer, minimum: 0 }
+                basePrice:      { type: number, minimum: 0, exclusiveMinimum: true }
+      responses:
+        '200':
+          description: Clase actualizada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FlightClass' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -566,9 +758,13 @@ paths:
       tags: [Reservations]
       summary: Crear reserva
       description: |
-        Crea una reserva y descuenta asientos en una **transacción atómica**.
-        Principio de **idempotencia** (sección 1.1 teoría): dos requests concurrentes
-        por el último asiento garantizan que solo uno confirma.
+        Transacción atómica que:
+        1. Verifica disponibilidad (`availableSeats >= pasajeros`)
+        2. Aplica descuento si se envía `promotionCode` (valida existencia, estado activo y límite de usos)
+        3. Crea la reserva y sus pasajeros en un solo commit
+        4. Decrementa `availableSeats` e incrementa `currentUsages` de la promo
+
+        Si dos peticiones concurrentes compiten por el último asiento, solo una confirma.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -580,14 +776,20 @@ paths:
               properties:
                 flightClassId:
                   type: string
-                  description: ID de la clase del vuelo
+                  format: uuid
                 passengers:
                   type: array
                   minItems: 1
-                  items: { $ref: '#/components/schemas/Passenger' }
+                  items:
+                    type: object
+                    required: [firstName, lastName, documentNumber]
+                    properties:
+                      firstName:      { type: string }
+                      lastName:       { type: string }
+                      documentNumber: { type: string }
+                      seatNumber:     { type: string, nullable: true }
                 promotionCode:
                   type: string
-                  description: Código de promoción opcional
                   example: VERANO25
       responses:
         '201':
@@ -603,7 +805,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422':
-          description: Sin disponibilidad o vuelo no disponible
+          description: Sin disponibilidad
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -616,7 +818,14 @@ paths:
           description: Lista de reservas
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Reservation' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -624,7 +833,7 @@ paths:
     get:
       tags: [Reservations]
       summary: Mis reservas
-      description: Devuelve el historial de reservas del usuario autenticado.
+      description: Devuelve el historial completo del usuario autenticado, con vuelo, pasajeros y promo.
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -643,14 +852,11 @@ paths:
 
   /reservations/{id}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
+      - { name: id, in: path, required: true, schema: { type: string } }
     get:
       tags: [Reservations]
       summary: Detalle de una reserva
-      description: Solo el dueño de la reserva o un admin pueden acceder.
+      description: Solo el dueño o un ADMIN pueden acceder.
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -668,27 +874,459 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Reservations]
-      summary: Cancelar reserva
-      description: Cancela la reserva y devuelve los asientos al vuelo.
+      summary: Cancelar reserva (DELETE)
+      description: |
+        Cancela la reserva y en una sola transacción atómica:
+        - Marca el estado como `CANCELLED`
+        - Restaura los asientos en `FlightClass.availableSeats`
+        - Decrementa `Promotion.currentUsages` si la reserva usó un código
       security: [{ bearerAuth: [] }]
       responses:
         '200':
           description: Reserva cancelada
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cancelled:       { type: boolean }
+                          reservationCode: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reservations/{id}/cancel:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Reservations]
+      summary: Cancelar reserva (PATCH)
+      description: |
+        Equivalente funcional a `DELETE /{id}` — existe para compatibilidad con
+        el cliente Angular que usa PATCH. Aplica la misma lógica atómica de
+        restauración de asientos y decremento de promo.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Reserva cancelada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cancelled:       { type: boolean }
+                          reservationCode: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reservations/{id}/passengers/{passengerId}/seat:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: ID de la reserva }
+      - { name: passengerId, in: path, required: true, schema: { type: string }, description: ID del pasajero }
+    patch:
+      tags: [Reservations]
+      summary: Asignar asiento a un pasajero
+      description: |
+        Permite asignar o cambiar el número de asiento de un pasajero.
+        - Solo el dueño de la reserva o un ADMIN pueden llamar este endpoint.
+        - Retorna 409 si el asiento ya está ocupado por otro pasajero del mismo vuelo y clase.
+        - El número de asiento se normaliza a mayúsculas (ej: `14c` → `14C`).
+
+        Se puede llamar durante el check-in o de forma independiente post check-in.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seatNumber]
+              properties:
+                seatNumber:
+                  type: string
+                  example: 14C
+                  description: Número de asiento (letras y números, se convierte a mayúsculas)
+      responses:
+        '200':
+          description: Asiento asignado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Passenger' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ── PAYMENTS ────────────────────────────────────────────────
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Registrar pago
+      description: |
+        Crea el registro de pago y dispara `autoGenerateInvoice()` de forma asíncrona.
+        La factura se genera automáticamente con IVA 15% basado en el monto del pago.
+        El número de factura usa `crypto.randomBytes` para evitar colisiones.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservationId, amount, provider, transactionId]
+              properties:
+                reservationId: { type: string, format: uuid }
+                amount:        { type: number, minimum: 0, exclusiveMinimum: true }
+                provider:      { type: string, example: VISA }
+                transactionId: { type: string, example: TXN-20250615-001 }
+                status:        { type: string, enum: [PENDING, COMPLETED, FAILED, REFUNDED] }
+      responses:
+        '201':
+          description: Pago registrado. La factura se genera de forma asíncrona.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Payment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      tags: [Payments]
+      summary: Listar pagos (admin)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de pagos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Payment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /payments/by-reservation/{reservationId}:
+    parameters:
+      - { name: reservationId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Payments]
+      summary: Pagos de una reserva
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Pagos encontrados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Payment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── INVOICES ────────────────────────────────────────────────
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: Listar facturas (admin)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de facturas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Invoice' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /invoices/by-payment/{paymentId}:
+    parameters:
+      - { name: paymentId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Invoices]
+      summary: Factura de un pago
+      description: Devuelve la factura generada automáticamente para el pago indicado.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Factura encontrada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Invoice' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── INVOICE ITEMS ────────────────────────────────────────────
+  /invoice-items:
+    post:
+      tags: [Invoices]
+      summary: Crear ítem de factura (admin)
+      description: |
+        Todos los campos son validados por Zod antes de persistir.
+        `totalPrice` debe ser coherente con `quantity * unitPrice`.
+        Después de crear/modificar ítems, el frontend recalcula automáticamente
+        subtotal, taxAmount y total de la factura padre.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoiceId, description, quantity, unitPrice, totalPrice]
+              properties:
+                invoiceId:   { type: string, format: uuid }
+                description: { type: string, minLength: 1 }
+                quantity:    { type: integer, minimum: 1 }
+                unitPrice:   { type: number, minimum: 0 }
+                totalPrice:  { type: number, minimum: 0 }
+      responses:
+        '201':
+          description: Ítem creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InvoiceItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /invoice-items/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Invoices]
+      summary: Actualizar ítem de factura (admin)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string }
+                quantity:    { type: integer, minimum: 1 }
+                unitPrice:   { type: number, minimum: 0 }
+                totalPrice:  { type: number, minimum: 0 }
+      responses:
+        '200':
+          description: Ítem actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/InvoiceItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Invoices]
+      summary: Eliminar ítem de factura (admin)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Ítem eliminado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── BOARDING PASSES ──────────────────────────────────────────
+  /boarding-passes:
+    post:
+      tags: [CheckIn]
+      summary: Emitir pase de abordar (check-in)
+      description: |
+        Registra el check-in de un pasajero para un segmento de vuelo.
+        Un pasajero solo puede tener un pase por segmento (unique constraint).
+        Estado inicial: `CHECKED_IN`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passengerId, segmentId, boardingCode]
+              properties:
+                passengerId:  { type: string, format: uuid }
+                segmentId:    { type: string, format: uuid }
+                boardingCode: { type: string, example: BP-A3F7-XK9M }
+                gate:         { type: string, nullable: true }
+                boardingGroup: { type: string, nullable: true }
+                checkInAt:    { type: string, format: date-time }
+                status:       { type: string, enum: [NOT_CHECKED_IN, CHECKED_IN, BOARDED, NO_SHOW], default: CHECKED_IN }
+      responses:
+        '201':
+          description: Pase de abordar emitido
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/BoardingPass' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /boarding-passes/by-passenger/{passengerId}:
+    parameters:
+      - { name: passengerId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [CheckIn]
+      summary: Pases de abordar de un pasajero
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Pases encontrados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/BoardingPass' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── PASSENGER SERVICES ───────────────────────────────────────
+  /passenger-services:
+    post:
+      tags: [PassengerServices]
+      summary: Agregar servicio adicional a un pasajero
+      description: |
+        Registra un servicio adicional (equipaje, comida, etc.) para un pasajero.
+        El precio `unitPriceAtBooking` queda fijo al momento de la compra.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passengerId, serviceConfigId, quantity, unitPriceAtBooking]
+              properties:
+                passengerId:        { type: string, format: uuid }
+                serviceConfigId:    { type: string, format: uuid }
+                quantity:           { type: integer, minimum: 1 }
+                unitPriceAtBooking: { type: number, minimum: 0 }
+      responses:
+        '201':
+          description: Servicio agregado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PassengerService' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /passenger-services/by-passenger/{passengerId}:
+    parameters:
+      - { name: passengerId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [PassengerServices]
+      summary: Servicios de un pasajero
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Servicios encontrados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PassengerService' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /passenger-services/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [PassengerServices]
+      summary: Eliminar servicio adicional
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Servicio eliminado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ── PROMOTIONS ──────────────────────────────────────────────
   /promotions/validate:
     post:
       tags: [Promotions]
-      summary: Validar código de promoción
+      summary: Validar código de promoción (público)
       description: |
-        Endpoint **público** — el frontend lo llama durante el checkout
-        para mostrar el descuento antes de confirmar la reserva.
+        Permite al frontend mostrar el descuento calculado antes de confirmar la reserva.
+        No requiere autenticación. Verifica que la promo esté activa y con usos disponibles.
       requestBody:
         required: true
         content:
@@ -698,10 +1336,10 @@ paths:
               required: [code, amount]
               properties:
                 code:   { type: string, example: VERANO25 }
-                amount: { type: number, example: 178.00 }
+                amount: { type: number, minimum: 0, exclusiveMinimum: true, example: 178.00 }
       responses:
         '200':
-          description: Promoción válida
+          description: Resultado de validación
           content:
             application/json:
               schema:
@@ -714,7 +1352,7 @@ paths:
                         properties:
                           valid:          { type: boolean }
                           code:           { type: string }
-                          discountType:   { type: string }
+                          discountType:   { type: string, enum: [PERCENTAGE, FIXED_AMOUNT] }
                           discountValue:  { type: number }
                           discountAmount: { type: number }
                           finalAmount:    { type: number }
@@ -730,7 +1368,14 @@ paths:
           description: Lista de promociones
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Promotion' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
@@ -743,40 +1388,59 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code, discountType, discountValue, validFrom, validTo]
+              required: [code, discountType, discountValue]
               properties:
-                code:          { type: string }
-                description:   { type: string }
-                discountType:  { type: string, enum: [PERCENTAGE, FIXED] }
-                discountValue: { type: number }
-                maxUsages:     { type: integer, nullable: true }
-                validFrom:     { type: string, format: date-time }
-                validTo:       { type: string, format: date-time }
+                code:          { type: string, minLength: 1 }
+                discountType:  { type: string, enum: [PERCENTAGE, FIXED_AMOUNT] }
+                discountValue: { type: number, minimum: 0, exclusiveMinimum: true }
+                isActive:      { type: boolean, default: true }
+                maxUsages:     { type: integer, minimum: 1, nullable: true, description: null = ilimitado }
       responses:
         '201':
           description: Promoción creada
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SuccessResponse' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Promotion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /promotions/{id}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
-    put:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
       tags: [Promotions]
       summary: Actualizar promoción (admin)
       security: [{ bearerAuth: [] }]
       requestBody:
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              type: object
+              properties:
+                code:          { type: string }
+                discountType:  { type: string, enum: [PERCENTAGE, FIXED_AMOUNT] }
+                discountValue: { type: number, minimum: 0, exclusiveMinimum: true }
+                isActive:      { type: boolean }
+                maxUsages:     { type: integer, minimum: 1, nullable: true }
       responses:
-        '200': { description: Promoción actualizada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '200':
+          description: Promoción actualizada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Promotion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
     delete:
@@ -784,11 +1448,428 @@ paths:
       summary: Eliminar promoción (admin)
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: Promoción eliminada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '200':
+          description: Promoción eliminada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  # ── SERVICE CATALOG ──────────────────────────────────────────
+  /service-catalog:
+    get:
+      tags: [Services]
+      summary: Listar catálogo de servicios (público)
+      responses:
+        '200':
+          description: Lista de servicios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ServiceCatalog' }
+
+  /airline-service-config:
+    get:
+      tags: [Services]
+      summary: Listar configuraciones de servicio por aerolínea (público)
+      responses:
+        '200':
+          description: Lista de configuraciones
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/AirlineServiceConfig' }
+
   # ── ADMIN ────────────────────────────────────────────────────
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Dashboard con estadísticas globales
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Estadísticas del sistema
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalReservations: { type: integer }
+                          totalRevenue:      { type: number }
+                          totalUsers:        { type: integer }
+                          totalFlights:      { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Listar usuarios
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admin]
+      summary: Crear usuario
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, firstLastName]
+              properties:
+                email:         { type: string, format: email }
+                password:      { type: string, minLength: 6 }
+                firstName:     { type: string }
+                firstLastName: { type: string }
+                mainAddress:   { type: string }
+                role:          { type: string, enum: [CUSTOMER, ADMIN], default: CUSTOMER }
+                cityId:        { type: string, format: uuid }
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Admin]
+      summary: Actualizar usuario
+      security: [{ bearerAuth: [] }]
+      description: Si se envía `password`, se re-hashea automáticamente con bcrypt.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:     { type: string }
+                firstLastName: { type: string }
+                email:         { type: string, format: email }
+                password:      { type: string, minLength: 6 }
+                role:          { type: string, enum: [CUSTOMER, ADMIN] }
+                isActive:      { type: boolean }
+                cityId:        { type: string, format: uuid }
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Admin]
+      summary: Eliminar usuario
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Usuario eliminado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/flightclasses:
+    get:
+      tags: [Admin]
+      summary: Listar clases de vuelo (admin CRUD)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de clases
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+    post:
+      tags: [Admin]
+      summary: Crear clase de vuelo (admin CRUD)
+      description: Validado con CreateFlightClassSchema. Retorna 409 si ya existe la combinación (flightId, cabinClass).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flightId, cabinClass, availableSeats, basePrice]
+              properties:
+                flightId:       { type: string, format: uuid }
+                cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+                availableSeats: { type: integer, minimum: 0 }
+                basePrice:      { type: number, minimum: 0, exclusiveMinimum: true }
+      responses:
+        '201':
+          description: Clase creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/flightclasses/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Admin]
+      summary: Actualizar clase de vuelo (admin CRUD)
+      description: Validado con UpdateFlightClassSchema.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cabinClass:     { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+                availableSeats: { type: integer, minimum: 0 }
+                basePrice:      { type: number, minimum: 0, exclusiveMinimum: true }
+      responses:
+        '200':
+          description: Clase actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Admin]
+      summary: Eliminar clase de vuelo (admin CRUD)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Eliminado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+
+  /admin/segments:
+    get:
+      tags: [Admin]
+      summary: Listar segmentos
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de segmentos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Segment' }
+    post:
+      tags: [Admin]
+      summary: Crear segmento
+      description: |
+        Validado con CreateSegmentSchema:
+        - `departureDateTime` debe ser anterior a `arrivalDateTime`
+        - `estimatedDuration` en minutos, mínimo 1
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [segmentNumber, originAirportId, destinationAirportId, departureDateTime, arrivalDateTime, airlineId, estimatedDuration]
+              properties:
+                segmentNumber:        { type: string }
+                flightId:             { type: string, format: uuid, nullable: true }
+                originAirportId:      { type: string, format: uuid }
+                destinationAirportId: { type: string, format: uuid }
+                departureDateTime:    { type: string, format: date-time, description: Debe ser anterior a arrivalDateTime }
+                arrivalDateTime:      { type: string, format: date-time }
+                airlineId:            { type: string, format: uuid }
+                aircraftId:           { type: string, format: uuid, nullable: true }
+                estimatedDuration:    { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Segmento creado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Segment' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/segments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Admin]
+      summary: Actualizar segmento
+      description: Si se envían ambas fechas, se valida que departure < arrival.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                segmentNumber:        { type: string }
+                originAirportId:      { type: string, format: uuid }
+                destinationAirportId: { type: string, format: uuid }
+                departureDateTime:    { type: string, format: date-time }
+                arrivalDateTime:      { type: string, format: date-time }
+                airlineId:            { type: string, format: uuid }
+                aircraftId:           { type: string, format: uuid, nullable: true }
+                estimatedDuration:    { type: integer, minimum: 1 }
+                flightId:             { type: string, format: uuid, nullable: true }
+      responses:
+        '200':
+          description: Segmento actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Admin]
+      summary: Eliminar segmento
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Eliminado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+
+  /admin/countries:
+    get:
+      tags: [Admin]
+      summary: Listar países
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista de países, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    post:
+      tags: [Admin]
+      summary: Crear país
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, isoCode]
+              properties:
+                name:         { type: string }
+                isoCode:      { type: string, minLength: 2, maxLength: 3 }
+                phoneCode:    { type: string }
+                currencyCode: { type: string }
+      responses:
+        '201': { description: País creado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /admin/countries/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Admin]
+      summary: Actualizar país
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    delete:
+      tags: [Admin]
+      summary: Eliminar país
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Eliminado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /admin/cities:
+    get:
+      tags: [Admin]
+      summary: Listar ciudades
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista de ciudades, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+    post:
+      tags: [Admin]
+      summary: Crear ciudad
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, countryId]
+              properties:
+                name:      { type: string }
+                countryId: { type: string, format: uuid }
+                iataCode:  { type: string, minLength: 3, maxLength: 3 }
+      responses:
+        '201': { description: Ciudad creada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
   /admin/airports:
     get:
       tags: [Admin]
@@ -796,8 +1877,6 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { description: Lista de aeropuertos, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Admin]
       summary: Crear aeropuerto
@@ -808,42 +1887,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [iataCode, name, city, country, timezone]
+              required: [iataCode, name, cityId, timezone]
               properties:
-                iataCode:  { type: string, example: GYE }
+                iataCode:  { type: string, minLength: 3, maxLength: 3, example: GYE }
                 name:      { type: string }
-                city:      { type: string }
-                country:   { type: string }
-                timezone:  { type: string }
-                latitude:  { type: number }
-                longitude: { type: number }
+                cityId:    { type: string, format: uuid }
+                timezone:  { type: string, example: America/Guayaquil }
       responses:
         '201': { description: Aeropuerto creado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /admin/airports/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
-    put:
-      tags: [Admin]
-      summary: Actualizar aeropuerto
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        '200': { description: Actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    delete:
-      tags: [Admin]
-      summary: Eliminar aeropuerto
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: Eliminado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
   /admin/airlines:
     get:
@@ -862,48 +1914,26 @@ paths:
           application/json:
             schema:
               type: object
-              required: [iataCode, name]
+              required: [iataCode, name, countryId]
               properties:
-                iataCode: { type: string }
-                name:     { type: string }
-                country:  { type: string }
-                logoUrl:  { type: string }
+                iataCode:  { type: string, minLength: 2, maxLength: 2, example: AV }
+                name:      { type: string }
+                countryId: { type: string, format: uuid }
+                logoUrl:   { type: string, format: uri }
       responses:
         '201': { description: Aerolínea creada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
-  /admin/airlines/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
-    put:
-      tags: [Admin]
-      summary: Actualizar aerolínea
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        '200': { description: Actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    delete:
-      tags: [Admin]
-      summary: Eliminar aerolínea
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: Eliminado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-
-  /admin/routes:
+  /admin/aircraft:
     get:
       tags: [Admin]
-      summary: Listar rutas
+      summary: Listar aeronaves
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: Lista de rutas, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '200': { description: Lista de aeronaves, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
     post:
       tags: [Admin]
-      summary: Crear ruta
+      summary: Crear aeronave
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -911,72 +1941,83 @@ paths:
           application/json:
             schema:
               type: object
-              required: [originAirportId, destinationAirportId, estimatedDuration]
+              required: [airlineId, modelName, registration]
               properties:
-                originAirportId:      { type: string }
-                destinationAirportId: { type: string }
-                estimatedDuration:    { type: integer, description: Duración en minutos }
+                airlineId:    { type: string, format: uuid }
+                modelName:    { type: string, example: Boeing 737-800 }
+                registration: { type: string, example: HC-CJK }
+                hasWifi:      { type: boolean }
+                hasUsb:       { type: boolean }
       responses:
-        '201': { description: Ruta creada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '201': { description: Aeronave creada, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
 
-  /admin/users:
+  /admin/promotions:
     get:
       tags: [Admin]
-      summary: Listar usuarios
+      summary: Listar promociones (admin CRUD)
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: Lista de usuarios, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '200': { description: Lista, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /admin/invoice-items:
+    get:
+      tags: [Admin]
+      summary: Listar ítems de factura
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista de ítems, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /admin/invoices:
+    get:
+      tags: [Admin]
+      summary: Listar facturas (admin CRUD)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /admin/reservations:
+    get:
+      tags: [Admin]
+      summary: Listar reservas (admin CRUD)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+
+  /admin/auditlogs:
+    get:
+      tags: [Admin]
+      summary: Listar logs de auditoría
+      description: Cada operación CREATE/UPDATE/DELETE en el sistema genera un registro con datos previos y nuevos.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Lista de logs, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /admin/users/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
-    get:
-      tags: [Admin]
-      summary: Detalle de usuario con historial de reservas
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: Usuario encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '404': { $ref: '#/components/responses/NotFound' }
-    put:
-      tags: [Admin]
-      summary: Actualizar usuario (rol, estado, datos)
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                role:      { type: string, enum: [CUSTOMER, ADMIN] }
-                isActive:  { type: boolean }
-                firstName: { type: string }
-                lastName:  { type: string }
-      responses:
-        '200': { description: Usuario actualizado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-    delete:
-      tags: [Admin]
-      summary: Desactivar usuario (soft delete)
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: Usuario desactivado, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
-        '400': { $ref: '#/components/responses/BadRequest' }
-
 # ============================================================
-#   TAGS — agrupan endpoints en la documentación
+#   TAGS
 # ============================================================
 tags:
   - name: Auth
     description: Registro, login y gestión de perfil
   - name: Flights
     description: Búsqueda y gestión de vuelos
+  - name: FlightClasses
+    description: Clases de vuelo por cabina con disponibilidad y precios
   - name: Reservations
-    description: Flujo completo de reservas
+    description: Flujo completo — reserva, cancelación y asignación de asientos
+  - name: Payments
+    description: Registro de pagos y disparo automático de factura
+  - name: Invoices
+    description: Facturas y sus ítems (IVA 15%)
+  - name: CheckIn
+    description: Pases de abordar y proceso de check-in
+  - name: PassengerServices
+    description: Servicios adicionales por pasajero (equipaje, comida, etc.)
   - name: Promotions
-    description: Cupones y descuentos
+    description: Cupones de descuento con límite de usos
+  - name: Services
+    description: Catálogo de servicios y configuración por aerolínea
   - name: Admin
-    description: Panel de administración — solo rol ADMIN
+    description: Panel de administración CRUD — solo rol ADMIN
