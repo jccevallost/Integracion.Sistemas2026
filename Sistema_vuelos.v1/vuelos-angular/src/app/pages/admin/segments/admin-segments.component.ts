@@ -101,7 +101,13 @@ export class AdminSegmentsComponent implements OnInit {
     if (f.flightId) body.flightId = f.flightId;
     if (f.aircraftId) body.aircraftId = f.aircraftId;
     const obs = f.id ? this.svc.updateSegment(f.id, body) : this.svc.createSegment(body);
-    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => { this.errorMsg = err?.error?.error?.message ?? 'Error al guardar segmento'; this.saving.set(false); } });
+    obs.subscribe({ next: () => { this.modal.set(false); this.saving.set(false); this.load(); }, error: (err: any) => {
+      const fields = err?.error?.error?.fields;
+      this.errorMsg = fields && Object.keys(fields).length
+        ? Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join(' | ')
+        : (err?.error?.error?.message ?? 'Error al guardar segmento');
+      this.saving.set(false);
+    } });
   }
   del(id: string) { this.svc.deleteSegment(id).subscribe(() => this.load()); }
 }

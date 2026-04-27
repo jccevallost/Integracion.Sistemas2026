@@ -114,11 +114,11 @@ export const CreateSegmentInlineSchema = z.object({
   segmentNumber:        z.string().min(1, { message: 'segmentNumber es requerido' }),
   originAirportId:      uuid,
   destinationAirportId: uuid,
-  departureDateTime:    z.string().datetime({ message: 'departureDateTime debe ser fecha ISO 8601' }),
-  arrivalDateTime:      z.string().datetime({ message: 'arrivalDateTime debe ser fecha ISO 8601' }),
+  departureDateTime:    z.string().datetime({ offset: true, message: 'departureDateTime debe ser fecha ISO 8601' }),
+  arrivalDateTime:      z.string().datetime({ offset: true, message: 'arrivalDateTime debe ser fecha ISO 8601' }),
   airlineId:            uuid,
   aircraftId:           uuid.optional().nullable(),
-  estimatedDuration:    z.number().int().positive({ message: 'estimatedDuration en minutos es requerido' }),
+  estimatedDuration:    z.coerce.number().int().positive({ message: 'estimatedDuration en minutos es requerido' }),
 });
 
 export const CreateFlightSchema = z.object({
@@ -176,11 +176,11 @@ export const UpdateSegmentSchema = z.object({
   segmentNumber:        z.string().optional(),
   originAirportId:      uuid.optional(),
   destinationAirportId: uuid.optional(),
-  departureDateTime:    z.string().datetime().optional(),
-  arrivalDateTime:      z.string().datetime().optional(),
+  departureDateTime:    z.string().datetime({ offset: true }).optional(),
+  arrivalDateTime:      z.string().datetime({ offset: true }).optional(),
   airlineId:            uuid.optional(),
   aircraftId:           uuid.optional().nullable(),
-  estimatedDuration:    z.number().int().positive().optional(),
+  estimatedDuration:    z.coerce.number().int().positive().optional(),
   flightId:             uuid.optional().nullable(),
 }).refine(
   d => {
