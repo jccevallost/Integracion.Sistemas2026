@@ -175,12 +175,21 @@ interface PassengerState {
                         </div>
 
                         <div class="relative">
-                          <div class="hidden sm:block absolute -left-8 top-[19rem] h-52 w-16 rounded-l-[90%] bg-gradient-to-r from-sky-100 to-sky-50 border border-blue-100"></div>
-                          <div class="hidden sm:block absolute -right-8 top-[19rem] h-52 w-16 rounded-r-[90%] bg-gradient-to-l from-sky-100 to-sky-50 border border-blue-100"></div>
-                          <span class="hidden sm:flex absolute -left-9 top-[24.5rem] -rotate-90 text-[10px] font-bold tracking-wider text-orange-500">SALIDA</span>
-                          <span class="hidden sm:flex absolute -right-9 top-[24.5rem] rotate-90 text-[10px] font-bold tracking-wider text-orange-500">SALIDA</span>
+                          <div class="hidden sm:flex absolute -left-10 top-[17.5rem] h-60 w-20 rounded-l-[90%] bg-gradient-to-r from-sky-200 to-sky-50 border border-blue-100 items-center justify-center">
+                            <span class="-rotate-90 text-[11px] font-bold tracking-wider text-sky-700">ALA IZQ.</span>
+                          </div>
+                          <div class="hidden sm:flex absolute -right-10 top-[17.5rem] h-60 w-20 rounded-r-[90%] bg-gradient-to-l from-sky-200 to-sky-50 border border-blue-100 items-center justify-center">
+                            <span class="rotate-90 text-[11px] font-bold tracking-wider text-sky-700">ALA DER.</span>
+                          </div>
+                          <span class="hidden sm:flex absolute -left-10 top-[24.5rem] -rotate-90 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold tracking-wider text-orange-600 border border-orange-200">SALIDA</span>
+                          <span class="hidden sm:flex absolute -right-10 top-[24.5rem] rotate-90 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-bold tracking-wider text-orange-600 border border-orange-200">SALIDA</span>
 
                           <div class="relative mx-auto rounded-b-[54px] border-x border-b border-blue-100 bg-white px-4 pb-6 pt-4 shadow-inner">
+                            <div class="mb-3 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-center">
+                              <span class="rounded-lg border border-gray-200 bg-gray-50 py-1 text-[10px] font-bold text-gray-500">WC</span>
+                              <span class="text-[10px] font-bold uppercase text-gray-300">Pasillo</span>
+                              <span class="rounded-lg border border-gray-200 bg-gray-50 py-1 text-[10px] font-bold text-gray-500">WC</span>
+                            </div>
                             <div class="mb-3 grid grid-cols-[1fr_2.5rem_1fr] gap-2 text-center">
                               <div class="grid grid-cols-3 gap-1 text-[10px] font-bold text-gray-400">
                                 <span *ngFor="let letter of leftSeatLetters">{{ letter }}</span>
@@ -192,9 +201,15 @@ interface PassengerState {
                             </div>
 
                             <div class="space-y-1">
-                              <div *ngFor="let row of seatRows" class="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-center">
+                              <ng-container *ngFor="let row of seatRows">
+                                <div *ngIf="isExitRow(row)" class="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 py-1 text-center">
+                                  <span class="h-px bg-orange-200"></span>
+                                  <span class="rounded-full bg-orange-50 px-2 py-1 text-[9px] font-bold text-orange-600 border border-orange-200">EXIT</span>
+                                  <span class="h-px bg-orange-200"></span>
+                                </div>
+                              <div class="grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-center">
                                 <div class="relative grid grid-cols-3 gap-1">
-                                  <span *ngIf="isExitRow(row)" class="absolute -left-6 top-1/2 -translate-y-1/2 text-[9px] font-bold text-orange-500 sm:hidden">EXIT</span>
+                                  <span *ngIf="isExitRow(row)" class="absolute -left-7 top-1/2 -translate-y-1/2 rounded bg-orange-50 px-1 text-[9px] font-bold text-orange-600 sm:hidden">EXIT</span>
                                   <button *ngFor="let letter of leftSeatLetters" type="button"
                                     (click)="selectSeat(i, row + letter)"
                                     [class]="seatButtonClass(ps, row + letter)">
@@ -212,15 +227,21 @@ interface PassengerState {
                                     <span class="block h-1 w-5 rounded-full bg-current opacity-30 mb-0.5"></span>
                                     <span>{{ row }}{{ letter }}</span>
                                   </button>
-                                  <span *ngIf="isExitRow(row)" class="absolute -right-6 top-1/2 -translate-y-1/2 text-[9px] font-bold text-orange-500 sm:hidden">EXIT</span>
+                                  <span *ngIf="isExitRow(row)" class="absolute -right-7 top-1/2 -translate-y-1/2 rounded bg-orange-50 px-1 text-[9px] font-bold text-orange-600 sm:hidden">EXIT</span>
                                 </div>
                               </div>
+                              </ng-container>
                             </div>
 
                             <div class="mt-3 grid grid-cols-3 gap-2 text-[10px] font-semibold text-gray-500">
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-white border border-gray-300"></i>Libre</span>
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-amber-100 border border-amber-300"></i>Premium</span>
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-blue-600"></i>Elegido</span>
+                            </div>
+                            <div class="mt-3 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-center">
+                              <span class="rounded-lg border border-gray-200 bg-gray-50 py-1 text-[10px] font-bold text-gray-500">WC</span>
+                              <span class="text-[10px] font-bold uppercase text-gray-300">Cola</span>
+                              <span class="rounded-lg border border-gray-200 bg-gray-50 py-1 text-[10px] font-bold text-gray-500">WC</span>
                             </div>
                           </div>
                         </div>
@@ -360,7 +381,7 @@ interface PassengerState {
                 <span>\${{ serviceExtrasTotal().toFixed(2) }}</span>
               </div>
               <div *ngIf="seatFeesTotal() > 0" class="flex justify-between text-gray-500">
-                <span>Asientos premium</span>
+                <span>Extra de asientos</span>
                 <span>\${{ seatFeesTotal().toFixed(2) }}</span>
               </div>
               <div class="flex justify-between font-semibold text-gray-800 pt-2 border-t border-gray-100">
@@ -662,10 +683,13 @@ export class ReservationDetailComponent implements OnInit {
 
   selectSeat(i: number, seat: string) {
     this.updatePS(i, { seatInput: seat });
+    if (this.seatPrice(seat) > 0) this.checkoutOpen.set(true);
+    if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
   }
 
   autoAssignSeat(i: number) {
     this.updatePS(i, { seatInput: this.autoSeatForIndex(i) });
+    if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
   }
 
   private autoSeatForIndex(i: number) {
@@ -683,7 +707,10 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   seatFeesTotal() {
-    return this.passengerStates().reduce((total, ps) => total + this.seatPrice(ps.passenger.seatNumber), 0);
+    return this.passengerStates().reduce((total, ps) => {
+      const activeSeat = ps.passenger.seatNumber || ps.seatInput;
+      return total + this.seatPrice(activeSeat);
+    }, 0);
   }
 
   pendingExtrasTotal() {
