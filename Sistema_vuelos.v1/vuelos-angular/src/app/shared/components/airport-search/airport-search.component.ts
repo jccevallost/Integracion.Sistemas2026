@@ -46,7 +46,7 @@ function airportScore(a: AirportOption, query: string): number {
     <div class="relative">
       <div class="relative">
         <ng-content select="[icon]"></ng-content>
-        <input #inputEl [(ngModel)]="query" (input)="onInput()" (focus)="open.set(true)" (keydown)="onKey($event)"
+        <input #inputEl [ngModel]="query()" (ngModelChange)="query.set($event); onInput()" (focus)="open.set(true)" (keydown)="onKey($event)"
           [placeholder]="placeholder" autocomplete="off"
           class="w-full border-2 rounded-xl pl-9 pr-8 py-3 text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400"
           [class.border-gray-200]="!selected()" [class.border-blue-400]="!!selected()" />
@@ -69,9 +69,9 @@ function airportScore(a: AirportOption, query: string): number {
         </button>
       </div>
 
-      <div *ngIf="open() && query.length >= 2 && filtered().length === 0 && !loading()"
+      <div *ngIf="open() && query().length >= 2 && filtered().length === 0 && !loading()"
         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl px-4 py-3 text-sm text-gray-400">
-        Sin resultados para "{{ query }}"
+        Sin resultados para "{{ query() }}"
       </div>
 
       <div *ngIf="open() && loading()"
@@ -87,7 +87,7 @@ export class AirportSearchComponent implements OnInit {
     const next = (v ?? '').trim().toUpperCase();
     if (!next) {
       this._code = '';
-      this.query = '';
+      this.query.set('');
       return;
     }
     if (next !== this._code) {
@@ -104,11 +104,11 @@ export class AirportSearchComponent implements OnInit {
   loading = signal(true);
   open = signal(false);
   cursor = signal(-1);
-  query = '';
+  query = signal('');
   private _code = '';
 
   filtered = computed(() => {
-    const q = normalizeText(this.query);
+    const q = normalizeText(this.query());
     if (q.length < 1) return this.airports().slice(0, 8);
 
     return this.airports()
@@ -119,7 +119,7 @@ export class AirportSearchComponent implements OnInit {
       .slice(0, 10);
   });
 
-  selected = computed(() => !!this._code);
+  selected() { return !!this._code; }
 
   ngOnInit() {
     this.svc.getAll().subscribe({
@@ -143,7 +143,7 @@ export class AirportSearchComponent implements OnInit {
 
   private syncLabel() {
     const found = this.airports().find(a => a.iataCode === this._code);
-    if (found) this.query = `${found.iataCode} - ${found.cityName}`;
+    if (found) this.query.set(`${found.iataCode} - ${found.cityName}`);
   }
 
   onInput() {
@@ -174,7 +174,7 @@ export class AirportSearchComponent implements OnInit {
 
   select(a: AirportOption) {
     this._code = a.iataCode;
-    this.query = `${a.iataCode} - ${a.cityName}`;
+    this.query.set(`${a.iataCode} - ${a.cityName}`);
     this.open.set(false);
     this.cursor.set(-1);
     this.valueChange.emit(a.iataCode);
@@ -182,7 +182,7 @@ export class AirportSearchComponent implements OnInit {
 
   resolveCurrentValue(): string {
     if (this._code) return this._code;
-    if (!normalizeText(this.query)) return '';
+    if (!normalizeText(this.query())) return '';
     const match = this.filtered()[0];
     if (!match) return '';
     this.select(match);
@@ -191,7 +191,7 @@ export class AirportSearchComponent implements OnInit {
 
   clear() {
     this._code = '';
-    this.query = '';
+    this.query.set('');
     this.open.set(false);
     this.valueChange.emit('');
   }

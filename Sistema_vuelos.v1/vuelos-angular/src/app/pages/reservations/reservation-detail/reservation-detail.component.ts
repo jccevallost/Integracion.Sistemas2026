@@ -30,6 +30,9 @@ const SERVICE_CAT_LABELS: Record<string, string> = {
   ENTERTAINMENT: 'Entretenimiento', LOUNGE: 'Sala VIP',
   INSURANCE: 'Seguro', TRANSPORT: 'Transporte', OTRO: 'Otro',
 };
+const SEAT_ROWS = [1, 2, 3, 4, 5, 6, 12, 14, 15, 16, 17, 18, 19, 20];
+const SEAT_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const SEAT_OPTIONS = SEAT_ROWS.flatMap(row => SEAT_LETTERS.map(letter => `${row}${letter}`));
 
 function generateBoardingCode(passengerId: string) {
   return `BP-${passengerId.slice(0, 4).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -138,24 +141,52 @@ interface PassengerState {
                     <!-- Asiento asignado o selector de asiento -->
                     <div class="border-t border-gray-100 pt-3">
                       <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Asiento</p>
-                      <p *ngIf="ps.passenger.seatNumber" class="text-sm font-semibold text-blue-700 font-mono">{{ ps.passenger.seatNumber }}</p>
-                      <div *ngIf="!ps.passenger.seatNumber && canEdit()" class="flex gap-2">
-                        <input [(ngModel)]="ps.seatInput" placeholder="Ej: 14C"
-                          class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none" />
-                        <button (click)="saveSeat(i)" [disabled]="!ps.seatInput"
-                          class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-60">
-                          Asignar
-                        </button>
+                      <div *ngIf="ps.passenger.seatNumber" class="flex items-center justify-between">
+                        <div>
+                          <p class="text-sm font-semibold text-blue-700 font-mono">{{ ps.passenger.seatNumber }}</p>
+                          <p class="text-xs text-gray-400">{{ seatLabel(ps.passenger.seatNumber) }}</p>
+                        </div>
+                        <span *ngIf="seatPrice(ps.passenger.seatNumber) > 0" class="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                          +\${{ seatPrice(ps.passenger.seatNumber).toFixed(2) }}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <ng-container *ngIf="!ps.boardingPasses[0] && canEdit()">
                     <div *ngIf="ps.checkingIn" class="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                      <p class="text-xs text-gray-500">Elige tu asiento y confirma el check-in.</p>
-                      <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Número de asiento (opcional)</label>
-                        <input [(ngModel)]="ps.seatInput" placeholder="Ej: 14C"
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-semibold text-gray-800">Seleccion de asiento</p>
+                          <p class="text-xs text-gray-500 mt-1">Elige un asiento o usa asignacion automatica sin costo.</p>
+                        </div>
+                        <button type="button" (click)="autoAssignSeat(i)"
+                          class="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg">
+                          Automatico gratis
+                        </button>
+                      </div>
+
+                      <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div class="grid grid-cols-7 gap-1 text-center text-[11px]">
+                          <span></span>
+                          <span *ngFor="let letter of seatLetters" class="font-semibold text-gray-400">{{ letter }}</span>
+                          <ng-container *ngFor="let row of seatRows">
+                            <span class="flex items-center justify-center font-semibold text-gray-400">{{ row }}</span>
+                            <button *ngFor="let letter of seatLetters" type="button"
+                              (click)="selectSeat(i, row + letter)"
+                              [class]="seatButtonClass(ps, row + letter)">
+                              {{ row }}{{ letter }}
+                            </button>
+                          </ng-container>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                        <span class="text-xs text-blue-900">
+                          {{ ps.seatInput ? ('Asiento ' + ps.seatInput + ' - ' + seatLabel(ps.seatInput)) : 'Asiento automatico sin costo al confirmar' }}
+                        </span>
+                        <span class="text-xs font-bold text-blue-700">
+                          {{ ps.seatInput ? ('+$' + seatPrice(ps.seatInput).toFixed(2)) : '$0.00' }}
+                        </span>
                       </div>
                       <div class="flex gap-2">
                         <button (click)="doCheckIn(i)"
@@ -266,8 +297,41 @@ interface PassengerState {
               <span class="font-semibold text-gray-800">Total pagado</span>
               <span class="text-2xl font-bold text-blue-600">\${{ (+r.totalAmount).toFixed(2) }}</span>
             </div>
-            <p *ngIf="payment()" class="text-xs text-gray-400 mt-2">Factura en proceso de generación...</p>
+            <p *ngIf="payment()" class="text-xs text-gray-400 mt-2">Factura en proceso de generacion...</p>
           </ng-container>
+          <div *ngIf="pendingExtrasTotal() > 0" class="mt-4 pt-4 border-t border-gray-100 space-y-3">
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-gray-500">
+                <span>Servicios adicionales</span>
+                <span>\${{ serviceExtrasTotal().toFixed(2) }}</span>
+              </div>
+              <div *ngIf="seatFeesTotal() > 0" class="flex justify-between text-gray-500">
+                <span>Asientos premium</span>
+                <span>\${{ seatFeesTotal().toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between font-semibold text-gray-800 pt-2 border-t border-gray-100">
+                <span>Checkout de extras</span>
+                <span class="text-amber-600">\${{ pendingExtrasTotal().toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between font-bold text-gray-900">
+                <span>Total con extras</span>
+                <span class="text-blue-600">\${{ grandTotal().toFixed(2) }}</span>
+              </div>
+            </div>
+            <button type="button" (click)="toggleCheckout()"
+              class="w-full bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
+              {{ checkoutOpen() ? 'Ocultar checkout' : 'Continuar checkout de extras' }}
+            </button>
+            <div *ngIf="checkoutOpen()" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
+              <p class="font-semibold">Checkout pendiente de pago</p>
+              <p>El frontend ya recalcula los extras. Para cobrarlo como aerolinea real falta permitir pagos parciales o cargos adicionales por reserva en el backend.</p>
+              <div class="grid grid-cols-3 gap-2 pt-1">
+                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">Tarjeta</button>
+                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">PayPal</button>
+                <button type="button" class="rounded-lg bg-white border border-amber-200 py-2 text-xs font-semibold">Transferencia</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Cancelar -->
@@ -297,8 +361,11 @@ export class ReservationDetailComponent implements OnInit {
   serviceConfigs  = signal<AirlineServiceConfig[]>([]);
   serviceConfigsLoading = signal(false);
   serviceConfigsError   = signal('');
+  checkoutOpen          = signal(false);
   payment         = signal<Payment | null>(null);
   invoice         = signal<Invoice | null>(null);
+  seatRows = SEAT_ROWS;
+  seatLetters = SEAT_LETTERS;
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -419,7 +486,7 @@ export class ReservationDetailComponent implements OnInit {
     if (!passId || !segmentId) { alert('No se encontró información del segmento.'); return; }
     this.bpSvc.create({ passengerId: passId, segmentId, boardingCode: generateBoardingCode(passId), status: 'CHECKED_IN' }).subscribe({
       next: r => {
-        const seatToSet = ps.seatInput?.trim().toUpperCase();
+        const seatToSet = ps.seatInput?.trim().toUpperCase() || this.autoSeatForIndex(i);
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], boardingPasses: [r.data], checkingIn: false, seatInput: '' };
         this.passengerStates.set(s2);
@@ -429,28 +496,13 @@ export class ReservationDetailComponent implements OnInit {
               const s3 = [...this.passengerStates()];
               s3[i] = { ...s3[i], passenger: { ...s3[i].passenger, seatNumber: seatToSet } as any };
               this.passengerStates.set(s3);
+              if (this.seatPrice(seatToSet) > 0) this.checkoutOpen.set(true);
             },
             error: err => alert(err?.error?.error?.message ?? 'Check-in OK, pero no se pudo asignar el asiento'),
           });
         }
       },
       error: err => alert(err?.error?.error?.message ?? 'Error al hacer check-in'),
-    });
-  }
-
-  saveSeat(i: number) {
-    const ps    = this.passengerStates()[i];
-    const resId = this.reservation()?.id;
-    const passId = ps.passenger.id;
-    const seat   = ps.seatInput?.trim().toUpperCase();
-    if (!resId || !passId || !seat) return;
-    this.resSvc.setSeat(resId, passId, seat).subscribe({
-      next: () => {
-        const s2 = [...this.passengerStates()];
-        s2[i] = { ...s2[i], passenger: { ...s2[i].passenger, seatNumber: seat } as any, seatInput: '' };
-        this.passengerStates.set(s2);
-      },
-      error: err => alert(err?.error?.error?.message ?? 'Error al asignar asiento'),
     });
   }
 
@@ -464,6 +516,7 @@ export class ReservationDetailComponent implements OnInit {
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], passengerServices: [...s2[i].passengerServices, r.data], addingService: false, selectedConfig: '' };
         this.passengerStates.set(s2);
+        this.checkoutOpen.set(true);
       },
       error: err => alert(err?.error?.error?.message ?? 'Error al agregar servicio'),
     });
@@ -475,6 +528,7 @@ export class ReservationDetailComponent implements OnInit {
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], passengerServices: s2[i].passengerServices.filter(s => s.id !== svcId) };
         this.passengerStates.set(s2);
+        if (this.pendingExtrasTotal() === 0) this.checkoutOpen.set(false);
       },
     });
   }
@@ -501,6 +555,75 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   catLabel(cat?: string) { return cat ? (SERVICE_CAT_LABELS[cat] ?? cat) : ''; }
+
+  seatPrice(seat?: string | null) {
+    if (!seat) return 0;
+    const row = Number.parseInt(seat, 10);
+    const letter = seat.slice(-1).toUpperCase();
+    if (row <= 2) return 45;
+    if (row === 12) return 30;
+    if (letter === 'A' || letter === 'F') return 12;
+    if (letter === 'C' || letter === 'D') return 10;
+    return 0;
+  }
+
+  seatLabel(seat?: string | null) {
+    const price = this.seatPrice(seat);
+    if (!seat || price === 0) return 'Estandar sin costo';
+    const row = Number.parseInt(seat, 10);
+    if (row <= 2) return 'Primera fila / espacio preferente';
+    if (row === 12) return 'Salida de emergencia';
+    const letter = seat.slice(-1).toUpperCase();
+    if (letter === 'A' || letter === 'F') return 'Ventana preferente';
+    return 'Pasillo preferente';
+  }
+
+  seatButtonClass(ps: PassengerState, seat: string) {
+    const selected = ps.seatInput === seat;
+    const price = this.seatPrice(seat);
+    const base = 'h-9 rounded-lg text-[11px] font-bold transition-colors border';
+    if (selected) return `${base} bg-blue-600 text-white border-blue-600 shadow-sm`;
+    if (price > 0) return `${base} bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100`;
+    return `${base} bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-200`;
+  }
+
+  selectSeat(i: number, seat: string) {
+    this.updatePS(i, { seatInput: seat });
+  }
+
+  autoAssignSeat(i: number) {
+    this.updatePS(i, { seatInput: this.autoSeatForIndex(i) });
+  }
+
+  private autoSeatForIndex(i: number) {
+    const used = new Set(this.passengerStates().map(ps => ps.passenger.seatNumber).filter(Boolean) as string[]);
+    const freeStandard = SEAT_OPTIONS.find(seat => !used.has(seat) && this.seatPrice(seat) === 0);
+    return freeStandard ?? SEAT_OPTIONS[i % SEAT_OPTIONS.length];
+  }
+
+  serviceExtrasTotal() {
+    return this.passengerStates().reduce((total, ps) => total + ps.passengerServices.reduce((sum, svc) => {
+      const quantity = Number(svc.quantity ?? 1);
+      const unit = Number(svc.unitPriceAtBooking ?? 0);
+      return sum + quantity * unit;
+    }, 0), 0);
+  }
+
+  seatFeesTotal() {
+    return this.passengerStates().reduce((total, ps) => total + this.seatPrice(ps.passenger.seatNumber), 0);
+  }
+
+  pendingExtrasTotal() {
+    return this.serviceExtrasTotal() + this.seatFeesTotal();
+  }
+
+  grandTotal() {
+    return Number(this.reservation()?.totalAmount ?? 0) + this.pendingExtrasTotal();
+  }
+
+  toggleCheckout() {
+    this.checkoutOpen.update(v => !v);
+  }
 
   createdDate(r: Reservation) {
     try { return format(new Date(r.createdAt), "d 'de' MMMM, yyyy", { locale: es }); } catch { return r.createdAt; }
