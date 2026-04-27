@@ -152,6 +152,7 @@ exports.Prisma.UserScalarFieldEnum = {
   birthDate: 'birthDate',
   role: 'role',
   isActive: 'isActive',
+  tokenVersion: 'tokenVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
