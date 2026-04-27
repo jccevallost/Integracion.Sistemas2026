@@ -235,16 +235,24 @@ interface PassengerState {
                 </div>
 
                 <div *ngIf="ps.addingService" class="bg-white border border-blue-200 rounded-lg p-3 space-y-2">
-                  <select [value]="ps.selectedConfig" (change)="updatePS(i, {selectedConfig: $any($event.target).value})"
+                  <select [ngModel]="ps.selectedConfig" (ngModelChange)="selectServiceConfig(i, $event)"
                     [disabled]="serviceConfigsLoading() || serviceConfigs().length === 0"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400">
-                    <option value="">Selecciona un servicio...</option>
+                    <option [ngValue]="''">Selecciona un servicio...</option>
                     <option *ngIf="serviceConfigsLoading()" value="" disabled>Cargando servicios...</option>
                     <option *ngIf="!serviceConfigsLoading() && serviceConfigs().length === 0" value="" disabled>No hay servicios disponibles</option>
-                    <option *ngFor="let c of serviceConfigs()" [value]="c.id">
+                    <option *ngFor="let c of serviceConfigs()" [ngValue]="c.id">
                       {{ catLabel(c.service?.category) }} — {{ c.service?.name ?? c.id }} (\${{ c.price }} {{ c.currency }})
                     </option>
                   </select>
+                  <div *ngIf="selectedServiceConfig(ps) as selected"
+                    class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-blue-950 truncate">{{ selected.service?.name ?? 'Servicio adicional' }}</p>
+                      <p class="text-xs text-blue-700">{{ catLabel(selected.service?.category) }} - {{ selected.currency }}</p>
+                    </div>
+                    <span class="text-sm font-bold text-blue-700">\${{ (+selected.price).toFixed(2) }}</span>
+                  </div>
                   <p *ngIf="serviceConfigsError()" class="text-xs text-red-500">{{ serviceConfigsError() }}</p>
                   <div class="flex gap-2">
                     <button (click)="addService(i)" [disabled]="!ps.selectedConfig"
@@ -476,6 +484,14 @@ export class ReservationDetailComponent implements OnInit {
     const s = [...this.passengerStates()];
     s[i] = { ...s[i], ...partial };
     this.passengerStates.set(s);
+  }
+
+  selectServiceConfig(i: number, selectedConfig: string) {
+    this.updatePS(i, { selectedConfig });
+  }
+
+  selectedServiceConfig(ps: PassengerState) {
+    return this.serviceConfigs().find(c => String(c.id) === String(ps.selectedConfig));
   }
 
   doCheckIn(i: number) {
