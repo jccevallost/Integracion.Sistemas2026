@@ -136,6 +136,7 @@ export interface PromotionValidation {
 }
 export interface AirlineServiceConfig {
   id: string; serviceId: string; airlineId: string;
+  originAirportId?: string | null; destAirportId?: string | null;
   price: number; currency: string;
   service?: { id: string; name: string; code: string; category: string };
   airline?: { id: string; name: string; iataCode: string };

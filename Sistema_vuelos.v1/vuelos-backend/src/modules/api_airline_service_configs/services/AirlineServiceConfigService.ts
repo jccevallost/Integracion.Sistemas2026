@@ -16,6 +16,10 @@ export class AirlineServiceConfigService implements IAirlineServiceConfigService
 
   async findByAirline(airlineId: string) { return this.repo.findByAirline(airlineId); }
 
+  async findAvailableForRoute(airlineId: string, originAirportId?: string, destAirportId?: string) {
+    return this.repo.findAvailableForRoute(airlineId, originAirportId, destAirportId);
+  }
+
   async create(data: any) { return this.repo.create(data); }
 
   async update(id: string, data: any) {

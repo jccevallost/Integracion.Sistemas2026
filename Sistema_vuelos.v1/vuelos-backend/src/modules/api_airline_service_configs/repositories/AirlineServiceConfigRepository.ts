@@ -7,8 +7,6 @@ import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';
 const include = {
   service: true,
   airline: true,
-  originAirport: true,
-  destAirport: true,
 };
 
 export class AirlineServiceConfigRepository implements IAirlineServiceConfigRepository {
@@ -29,6 +27,19 @@ export class AirlineServiceConfigRepository implements IAirlineServiceConfigRepo
 
   async findByAirline(airlineId: string): Promise<any[]> {
     return this.db.airlineServiceConfig.findMany({ where: { airlineId }, include });
+  }
+
+  async findAvailableForRoute(airlineId: string, originAirportId?: string, destAirportId?: string): Promise<any[]> {
+    const routeFilters: any[] = [{ originAirportId: null, destAirportId: null }];
+    if (originAirportId) routeFilters.push({ originAirportId, destAirportId: null });
+    if (destAirportId) routeFilters.push({ originAirportId: null, destAirportId });
+    if (originAirportId && destAirportId) routeFilters.push({ originAirportId, destAirportId });
+
+    return this.db.airlineServiceConfig.findMany({
+      where: { airlineId, OR: routeFilters },
+      include,
+      orderBy: { price: 'asc' },
+    });
   }
 
   async findByService(serviceId: string): Promise<any[]> {

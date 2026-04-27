@@ -21,7 +21,11 @@ export class AirlineServiceConfigController {
 
   listByAirline = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const data = await this.service.findByAirline(String(req.params.airlineId));
+      const originAirportId = req.query.originAirportId ? String(req.query.originAirportId) : undefined;
+      const destAirportId = req.query.destAirportId ? String(req.query.destAirportId) : undefined;
+      const data = originAirportId || destAirportId
+        ? await this.service.findAvailableForRoute(String(req.params.airlineId), originAirportId, destAirportId)
+        : await this.service.findByAirline(String(req.params.airlineId));
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };

@@ -205,12 +205,16 @@ interface PassengerState {
 
                 <div *ngIf="ps.addingService" class="bg-white border border-blue-200 rounded-lg p-3 space-y-2">
                   <select [value]="ps.selectedConfig" (change)="updatePS(i, {selectedConfig: $any($event.target).value})"
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    [disabled]="serviceConfigsLoading() || serviceConfigs().length === 0"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-50 disabled:text-gray-400">
                     <option value="">Selecciona un servicio...</option>
+                    <option *ngIf="serviceConfigsLoading()" value="" disabled>Cargando servicios...</option>
+                    <option *ngIf="!serviceConfigsLoading() && serviceConfigs().length === 0" value="" disabled>No hay servicios disponibles</option>
                     <option *ngFor="let c of serviceConfigs()" [value]="c.id">
                       {{ catLabel(c.service?.category) }} — {{ c.service?.name ?? c.id }} (\${{ c.price }} {{ c.currency }})
                     </option>
                   </select>
+                  <p *ngIf="serviceConfigsError()" class="text-xs text-red-500">{{ serviceConfigsError() }}</p>
                   <div class="flex gap-2">
                     <button (click)="addService(i)" [disabled]="!ps.selectedConfig"
                       class="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-lg transition-colors disabled:opacity-60">
@@ -291,6 +295,8 @@ export class ReservationDetailComponent implements OnInit {
   reservation     = signal<Reservation | null>(null);
   passengerStates = signal<PassengerState[]>([]);
   serviceConfigs  = signal<AirlineServiceConfig[]>([]);
+  serviceConfigsLoading = signal(false);
+  serviceConfigsError   = signal('');
   payment         = signal<Payment | null>(null);
   invoice         = signal<Invoice | null>(null);
 
@@ -306,12 +312,7 @@ export class ReservationDetailComponent implements OnInit {
           checkingIn: false, addingService: false, selectedConfig: '', seatInput: '',
           loadingBP: false, loadingServices: false,
         })));
-        const airlineId = res.data.flight?.airline?.id;
-        if (airlineId) {
-          this.ascSvc.byAirline(airlineId).subscribe({ next: r2 => this.serviceConfigs.set(r2.data), error: () => {} });
-        } else {
-          this.ascSvc.list().subscribe({ next: r2 => this.serviceConfigs.set(r2.data), error: () => {} });
-        }
+        this.loadServiceConfigs(res.data);
         this.paymentSvc.byReservation(id).subscribe({
           next: pr => {
             const payments = pr.data as any[];
@@ -328,6 +329,39 @@ export class ReservationDetailComponent implements OnInit {
         });
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  private loadServiceConfigs(reservation: Reservation) {
+    this.serviceConfigsLoading.set(true);
+    this.serviceConfigsError.set('');
+
+    const firstSegment = reservation.flight?.segments?.[0];
+    const airlineId = firstSegment?.airline?.id ?? reservation.flight?.airline?.id;
+    const originAirportId = firstSegment?.originAirport?.id ?? reservation.flight?.route?.originAirport?.id;
+    const destAirportId = firstSegment?.destinationAirport?.id ?? reservation.flight?.route?.destinationAirport?.id;
+    const request = airlineId
+      ? this.ascSvc.byAirline(airlineId, originAirportId, destAirportId)
+      : this.ascSvc.list();
+
+    request.subscribe({
+      next: res => {
+        this.serviceConfigs.set(this.filterConfigsForRoute(res.data, originAirportId, destAirportId));
+        this.serviceConfigsLoading.set(false);
+      },
+      error: () => {
+        this.serviceConfigs.set([]);
+        this.serviceConfigsError.set('No se pudieron cargar servicios para este vuelo.');
+        this.serviceConfigsLoading.set(false);
+      },
+    });
+  }
+
+  private filterConfigsForRoute(configs: AirlineServiceConfig[], originAirportId?: string | null, destAirportId?: string | null) {
+    return configs.filter(config => {
+      const originMatches = !config.originAirportId || !originAirportId || config.originAirportId === originAirportId;
+      const destMatches = !config.destAirportId || !destAirportId || config.destAirportId === destAirportId;
+      return originMatches && destMatches;
     });
   }
 
@@ -425,7 +459,7 @@ export class ReservationDetailComponent implements OnInit {
     const config = this.serviceConfigs().find(c => c.id === ps.selectedConfig);
     const passId = ps.passenger.id;
     if (!config || !passId) return;
-    this.psSvc.create({ passengerId: passId, serviceConfigId: config.id, quantity: 1, unitPriceAtBooking: config.price }).subscribe({
+    this.psSvc.create({ passengerId: passId, serviceConfigId: config.id, quantity: 1, unitPriceAtBooking: Number(config.price) }).subscribe({
       next: r => {
         const s2 = [...this.passengerStates()];
         s2[i] = { ...s2[i], passengerServices: [...s2[i].passengerServices, r.data], addingService: false, selectedConfig: '' };

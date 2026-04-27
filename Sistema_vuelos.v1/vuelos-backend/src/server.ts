@@ -179,7 +179,7 @@ app.use('/api/v1/boarding-passes',        createBoardingPassRouter(boardingPassC
 app.use('/api/v1/payments',               createPaymentRouter(paymentController));
 app.use('/api/v1/invoices',               createInvoiceRouter(invoiceController));
 app.use('/api/v1/invoice-items',          createInvoiceItemRouter(invoiceItemController));
-app.use('/api/v1/passenger-services',     createPassengerServiceRouter(passengerServiceController));
+app.use('/api/v1/passenger-services',     createPassengerServiceRouter(passengerServiceController, prisma));
 app.use('/api/v1/reservation-passengers', createReservationPassengerRouter(reservationPassengerController));
 app.use('/api/v1/audit-logs',             createAuditLogRouter(auditLogController));
 

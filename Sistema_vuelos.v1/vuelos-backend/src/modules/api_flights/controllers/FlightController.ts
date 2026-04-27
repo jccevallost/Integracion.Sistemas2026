@@ -14,11 +14,12 @@ export class FlightController {
 
   search = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { origin, destination, date, passengers, cabinClass } = req.query;
+      const { origin, destination, date, passengers } = req.query;
+      const cabinClass = (req.query.cabinClass ?? req.query.class) as string | undefined;
       const data = await this.flightService.search(
         origin as string, destination as string, date as string,
         passengers ? Number(passengers) : undefined,
-        cabinClass as string | undefined,
+        cabinClass,
       );
       res.json({ success: true, data });
     } catch (err) { next(err); }

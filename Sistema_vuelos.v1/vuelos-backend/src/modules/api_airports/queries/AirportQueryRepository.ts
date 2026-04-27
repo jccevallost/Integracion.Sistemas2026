@@ -10,9 +10,12 @@ export class AirportQueryRepository {
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
           { iataCode: { contains: query, mode: 'insensitive' } },
+          { city: { name: { contains: query, mode: 'insensitive' } } },
+          { city: { country: { name: { contains: query, mode: 'insensitive' } } } },
         ],
       },
       include: { city: { include: { country: true } } },
+      orderBy: { iataCode: 'asc' },
       take: 20,
     });
   }
