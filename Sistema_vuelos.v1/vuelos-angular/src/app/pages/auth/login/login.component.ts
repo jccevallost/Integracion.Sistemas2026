@@ -54,14 +54,6 @@ import { AuthStore } from '../../../core/store/auth.store';
             </button>
           </form>
 
-          <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p class="text-xs font-medium text-gray-500 mb-2">Credenciales de prueba:</p>
-            <div class="space-y-1 text-xs text-gray-600">
-              <p><span class="font-medium">Admin:</span> admin&#64;vuelosapp.com / admin123</p>
-              <p><span class="font-medium">Cliente:</span> cliente&#64;gmail.com / cliente123</p>
-            </div>
-          </div>
-
           <p class="text-center text-sm text-gray-500 mt-6">
             ¿No tienes cuenta? <a routerLink="/register" class="text-blue-600 font-medium hover:underline">Regístrate</a>
           </p>

@@ -165,18 +165,66 @@ interface PassengerState {
                         </button>
                       </div>
 
-                      <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                        <div class="grid grid-cols-7 gap-1 text-center text-[11px]">
-                          <span></span>
-                          <span *ngFor="let letter of seatLetters" class="font-semibold text-gray-400">{{ letter }}</span>
-                          <ng-container *ngFor="let row of seatRows">
-                            <span class="flex items-center justify-center font-semibold text-gray-400">{{ row }}</span>
-                            <button *ngFor="let letter of seatLetters" type="button"
-                              (click)="selectSeat(i, row + letter)"
-                              [class]="seatButtonClass(ps, row + letter)">
-                              {{ row }}{{ letter }}
-                            </button>
-                          </ng-container>
+                      <div class="relative mx-auto max-w-sm">
+                        <div class="mx-8 h-14 rounded-t-[80px] border-x border-t border-blue-100 bg-gradient-to-b from-sky-100 to-white flex items-end justify-center pb-3">
+                          <div class="grid grid-cols-2 gap-1.5">
+                            <span class="block h-3 w-7 rounded-t-full bg-blue-200/70 border border-blue-300"></span>
+                            <span class="block h-3 w-7 rounded-t-full bg-blue-200/70 border border-blue-300"></span>
+                          </div>
+                        </div>
+
+                        <div class="relative">
+                          <div class="hidden sm:block absolute -left-8 top-24 h-36 w-10 rounded-l-full bg-sky-100 border border-blue-100"></div>
+                          <div class="hidden sm:block absolute -right-8 top-24 h-36 w-10 rounded-r-full bg-sky-100 border border-blue-100"></div>
+
+                          <div class="relative mx-4 rounded-b-[42px] border-x border-b border-blue-100 bg-white px-3 pb-5 pt-3 shadow-inner">
+                            <div class="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                              <span>Puerta</span>
+                              <span>Cabina</span>
+                            </div>
+
+                            <div class="grid grid-cols-[1fr_2.5rem_1fr] gap-2 text-center">
+                              <div class="grid grid-cols-3 gap-1 text-[10px] font-bold text-gray-400">
+                                <span *ngFor="let letter of leftSeatLetters">{{ letter }}</span>
+                              </div>
+                              <span class="text-[10px] font-bold text-gray-300">Fila</span>
+                              <div class="grid grid-cols-3 gap-1 text-[10px] font-bold text-gray-400">
+                                <span *ngFor="let letter of rightSeatLetters">{{ letter }}</span>
+                              </div>
+
+                              <div class="grid grid-cols-3 gap-1">
+                                <ng-container *ngFor="let row of seatRows">
+                                  <button *ngFor="let letter of leftSeatLetters" type="button"
+                                    (click)="selectSeat(i, row + letter)"
+                                    [class]="seatButtonClass(ps, row + letter)">
+                                    <span class="block h-1 w-5 rounded-full bg-current opacity-30 mb-0.5"></span>
+                                    <span>{{ row }}{{ letter }}</span>
+                                  </button>
+                                </ng-container>
+                              </div>
+
+                              <div class="grid gap-1">
+                                <span *ngFor="let row of seatRows" [class]="rowMarkerClass(row)">{{ row }}</span>
+                              </div>
+
+                              <div class="grid grid-cols-3 gap-1">
+                                <ng-container *ngFor="let row of seatRows">
+                                  <button *ngFor="let letter of rightSeatLetters" type="button"
+                                    (click)="selectSeat(i, row + letter)"
+                                    [class]="seatButtonClass(ps, row + letter)">
+                                    <span class="block h-1 w-5 rounded-full bg-current opacity-30 mb-0.5"></span>
+                                    <span>{{ row }}{{ letter }}</span>
+                                  </button>
+                                </ng-container>
+                              </div>
+                            </div>
+
+                            <div class="mt-3 grid grid-cols-3 gap-2 text-[10px] font-semibold text-gray-500">
+                              <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-white border border-gray-300"></i>Libre</span>
+                              <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-amber-100 border border-amber-300"></i>Premium</span>
+                              <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-blue-600"></i>Elegido</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -373,7 +421,8 @@ export class ReservationDetailComponent implements OnInit {
   payment         = signal<Payment | null>(null);
   invoice         = signal<Invoice | null>(null);
   seatRows = SEAT_ROWS;
-  seatLetters = SEAT_LETTERS;
+  leftSeatLetters = SEAT_LETTERS.slice(0, 3);
+  rightSeatLetters = SEAT_LETTERS.slice(3);
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -597,10 +646,16 @@ export class ReservationDetailComponent implements OnInit {
   seatButtonClass(ps: PassengerState, seat: string) {
     const selected = ps.seatInput === seat;
     const price = this.seatPrice(seat);
-    const base = 'h-9 rounded-lg text-[11px] font-bold transition-colors border';
+    const base = 'h-10 rounded-lg text-[10px] font-bold transition-colors border flex flex-col items-center justify-center leading-none';
     if (selected) return `${base} bg-blue-600 text-white border-blue-600 shadow-sm`;
     if (price > 0) return `${base} bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100`;
     return `${base} bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-200`;
+  }
+
+  rowMarkerClass(row: number) {
+    const base = 'h-10 flex items-center justify-center rounded-lg text-[10px] font-bold';
+    if (row === 12) return `${base} bg-emerald-50 text-emerald-700 border border-emerald-200`;
+    return `${base} text-gray-400`;
   }
 
   selectSeat(i: number, seat: string) {
