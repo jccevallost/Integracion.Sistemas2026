@@ -4,13 +4,15 @@ import jwt from 'jsonwebtoken';
 import { IAuthService, LoginDto, RegisterDto, AuthResponseDto, UpdateProfileDto, ChangePasswordDto } from '../interfaces/IAuthService.js';
 import { IUserRepository } from '../interfaces/IUserRepository.js';
 import { ValidationException, ConflictException, NotFoundException } from '../../../shared/exceptions/BusinessException.js';
+import { getJwtSecret, getJwtSignOptions } from '../../../shared/security/jwt.config.js';
 
 export class AuthService implements IAuthService {
   constructor(private readonly userRepository: IUserRepository) {}
 
-  private generateToken(payload: { id: string; email: string; role: string }): string {
-    return jwt.sign(payload, process.env.JWT_SECRET!, {
-      expiresIn: (process.env.JWT_EXPIRES_IN ?? '7d') as any,
+  private generateToken(payload: { id: string; email: string; role: string; tokenVersion: number }): string {
+    return jwt.sign(payload, getJwtSecret(), {
+      ...getJwtSignOptions(process.env.JWT_EXPIRES_IN ?? '2h'),
+      subject: payload.id,
     });
   }
 
@@ -40,7 +42,7 @@ export class AuthService implements IAuthService {
       throw new ValidationException('Credenciales inválidas');
     }
 
-    const token = this.generateToken({ id: user.id, email: user.email, role: user.role });
+    const token = this.generateToken({ id: user.id, email: user.email, role: user.role, tokenVersion: (user as any).tokenVersion ?? 0 });
     return { user: this.sanitize(user), token };
   }
 
@@ -78,14 +80,14 @@ export class AuthService implements IAuthService {
       role: 'CUSTOMER',
     });
 
-    const token = this.generateToken({ id: (user as any).id, email: (user as any).email, role: (user as any).role });
+    const token = this.generateToken({ id: (user as any).id, email: (user as any).email, role: (user as any).role, tokenVersion: 0 });
     return { user: this.sanitize(user), token };
   }
 
   async getProfile(userId: string): Promise<any> {
     const user = await this.userRepository.findById(userId);
     if (!user) throw new NotFoundException('Usuario', userId);
-    return user;
+    return this.sanitize(user);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<any> {
@@ -117,6 +119,10 @@ export class AuthService implements IAuthService {
     if (!isValid) throw new ValidationException('Contraseña actual incorrecta');
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.userRepository.update(userId, { passwordHash });
+    await this.userRepository.update(userId, { passwordHash, tokenVersion: { increment: 1 } });
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.userRepository.update(userId, { tokenVersion: { increment: 1 } });
   }
 }

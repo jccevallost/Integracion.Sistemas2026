@@ -51,4 +51,5 @@ export interface IAuthService {
   getProfile(userId: string): Promise<any>;
   updateProfile(userId: string, dto: UpdateProfileDto): Promise<any>;
   changePassword(userId: string, dto: ChangePasswordDto): Promise<void>;
+  logout(userId: string): Promise<void>;
 }

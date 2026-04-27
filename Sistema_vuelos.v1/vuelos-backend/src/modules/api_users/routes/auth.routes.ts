@@ -7,6 +7,7 @@ export function createAuthRouter(controller: AuthController): Router {
   const router = Router();
   router.post('/register',         controller.register);
   router.post('/login',            controller.login);
+  router.post('/logout',           authenticate, controller.logout);
   router.get('/me',                authenticate, controller.me);
   router.put('/profile',           authenticate, controller.updateProfile);
   router.post('/change-password',  authenticate, controller.changePassword);

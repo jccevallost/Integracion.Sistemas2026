@@ -39,4 +39,11 @@ export class AuthController {
       res.status(200).json({ success: true, data: { message: 'Contraseña actualizada correctamente' } });
     } catch (err) { next(err); }
   };
+
+  logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await this.authService.logout(req.user!.id);
+      res.status(200).json({ success: true, data: { message: 'Sesión cerrada correctamente' } });
+    } catch (err) { next(err); }
+  };
 }
