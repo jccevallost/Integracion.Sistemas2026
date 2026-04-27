@@ -2,8 +2,11 @@
 // Schemas Zod — fuente de verdad para validación de entrada y documentación.
 import { z } from 'zod';
 
-// ── UUID helper ─────────────────────────────────────────────────────────────
-const uuid = z.string().uuid({ message: 'Debe ser un UUID válido' });
+// ── ID helper ───────────────────────────────────────────────────────────────
+const uuid = z.string().refine(
+  value => z.string().uuid().safeParse(value).success || z.string().cuid().safeParse(value).success,
+  { message: 'Debe ser un ID valido' },
+);
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 export const RegisterSchema = z.object({
