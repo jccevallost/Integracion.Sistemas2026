@@ -213,9 +213,11 @@ export const CreateReservationSchema = z.object({
 export const CreatePaymentSchema = z.object({
   reservationId: uuid,
   amount:        z.number().positive({ message: 'El monto debe ser mayor a 0' }),
-  provider:      z.string().min(1, { message: 'El proveedor de pago es requerido (ej: VISA, MASTERCARD)' }),
-  transactionId: z.string().min(1, { message: 'transactionId es requerido' }),
-  status:        z.string().optional(),
+  provider:      z.enum(['VISA','MASTERCARD','AMEX','PAYPAL','TRANSFER'], {
+    errorMap: () => ({ message: 'provider debe ser VISA, MASTERCARD, AMEX, PAYPAL o TRANSFER' }),
+  }),
+  transactionId: z.string().min(6, { message: 'transactionId debe tener al menos 6 caracteres' }).max(120),
+  status:        z.enum(['PENDING','COMPLETED','FAILED','REFUNDED']).optional(),
 });
 
 export const UpdatePaymentSchema = z.object({

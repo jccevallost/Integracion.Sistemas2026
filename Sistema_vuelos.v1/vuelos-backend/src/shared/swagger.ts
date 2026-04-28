@@ -3,18 +3,19 @@ import swaggerJsdoc from 'swagger-jsdoc';
 
 const options: swaggerJsdoc.Options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: '3.0.3',
     info: {
       title:       'Vuelos API',
-      version:     '1.0.0',
-      description: 'API REST para el sistema de gestión de vuelos. Arquitectura modular — una API por tabla de BD.',
+      version:     '1.1.0',
+      description: 'API REST publica de VuelosApp. REST/JSON es el contrato estable para Angular e integradores; gRPC, GraphQL y eventos quedan como evolucion documentada hasta que exista implementacion productiva.',
       contact: {
         name:  'Sistema Vuelos',
         email: 'admin@vuelos.com',
       },
     },
     servers: [
-      { url: 'https://integracion-sistemas2026.onrender.com/api/v1', description: 'Desarrollo local' },
+      { url: 'https://integracion-sistemas2026.onrender.com/api/v1', description: 'Produccion (Render)' },
+      { url: 'http://localhost:3000/api/v1', description: 'Desarrollo local' },
     ],
     components: {
       securitySchemes: {

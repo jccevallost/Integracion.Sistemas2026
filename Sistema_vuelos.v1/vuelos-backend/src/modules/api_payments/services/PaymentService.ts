@@ -26,7 +26,7 @@ export class PaymentService implements IPaymentService {
   async findByReservation(reservationId: string) { return this.repo.findByReservation(reservationId); }
 
   async create(data: any, userId?: string) {
-    const payment = await this.repo.create(data);
+    const payment = await this.repo.create({ ...data, status: data.status ?? 'COMPLETED' });
     if (userId) {
       this.autoGenerateInvoice(payment, userId).catch(err =>
         console.error('[PaymentService] Auto-invoice error:', err),

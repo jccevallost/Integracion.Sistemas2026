@@ -3,6 +3,8 @@ import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './shared/swagger.js';
 
@@ -59,6 +61,7 @@ import { createPassengerServiceRouter }      from './modules/api_passenger_servi
 import { createReservationPassengerRouter }  from './modules/api_reservation_passengers/routes/reservation-passengers.routes.js';
 import { createAuditLogRouter }              from './modules/api_audit_logs/routes/audit-logs.routes.js';
 import { errorHandler }                      from './shared/middlewares/error.middleware.js';
+import { validateJwtConfig }                 from './shared/security/jwt.config.js';
 
 // ============================================================
 //                        APP SETUP
@@ -66,6 +69,16 @@ import { errorHandler }                      from './shared/middlewares/error.mi
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
+
+validateJwtConfig();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'no-referrer' },
+}));
 
 // ── CORS ─────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -82,19 +95,64 @@ app.use(cors({
     console.warn('⚠️  CORS bloqueado:', origin);
     cb(new Error('Not allowed by CORS'));
   },
-  credentials: true,
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id'],
+  maxAge: 600,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 450,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Demasiadas solicitudes. Intenta nuevamente en unos minutos.' } },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Demasiados intentos de autenticacion. Intenta mas tarde.' } },
+});
+
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 90,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Demasiadas busquedas. Intenta nuevamente en unos segundos.' } },
+});
+
+app.use('/api', apiLimiter);
+app.use(['/api/v1/auth/login', '/api/auth/login', '/api/v1/auth/register', '/api/auth/register'], authLimiter);
+app.use(['/api/v1/flights/search', '/api/flights/search'], searchLimiter);
+
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && Number(req.headers['content-length'] ?? 0) > 0 && !req.is('application/json')) {
+    res.status(415).json({ success: false, error: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'Content-Type debe ser application/json' } });
+    return;
+  }
+  next();
+});
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ── Correlation ID ───────────────────────────────────────────
 app.use((req, res, next) => {
   const cid = (req.headers['x-correlation-id'] as string) || randomUUID();
   req.headers['x-correlation-id'] = cid;
   res.setHeader('X-Correlation-Id', cid);
+  next();
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+  }
   next();
 });
 
@@ -110,7 +168,7 @@ if (process.env.NODE_ENV === 'development') {
 //                        HEALTH CHECK
 // ============================================================
 
-app.get('/', (_req, res) => {
+app.get(['/', '/api/v1'], (_req, res) => {
   res.json({
     service: 'Vuelos API',
     version: '1.0.0',
@@ -174,13 +232,13 @@ app.use('/api/v1/segments',      createSegmentRouter(segmentController));
 app.use('/api/v1/service-catalog', createServiceCatalogRouter(serviceCatalogController));
 
 // Operaciones autenticadas
-app.use('/api/v1/billing-profiles',       createBillingProfileRouter(billingProfileController));
-app.use('/api/v1/boarding-passes',        createBoardingPassRouter(boardingPassController));
-app.use('/api/v1/payments',               createPaymentRouter(paymentController));
-app.use('/api/v1/invoices',               createInvoiceRouter(invoiceController));
-app.use('/api/v1/invoice-items',          createInvoiceItemRouter(invoiceItemController));
+app.use('/api/v1/billing-profiles',       createBillingProfileRouter(billingProfileController, prisma));
+app.use('/api/v1/boarding-passes',        createBoardingPassRouter(boardingPassController, prisma));
+app.use('/api/v1/payments',               createPaymentRouter(paymentController, prisma));
+app.use('/api/v1/invoices',               createInvoiceRouter(invoiceController, prisma));
+app.use('/api/v1/invoice-items',          createInvoiceItemRouter(invoiceItemController, prisma));
 app.use('/api/v1/passenger-services',     createPassengerServiceRouter(passengerServiceController, prisma));
-app.use('/api/v1/reservation-passengers', createReservationPassengerRouter(reservationPassengerController));
+app.use('/api/v1/reservation-passengers', createReservationPassengerRouter(reservationPassengerController, prisma));
 app.use('/api/v1/audit-logs',             createAuditLogRouter(auditLogController));
 
 // Admin panel (todas requieren ADMIN)
@@ -199,6 +257,10 @@ app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   swaggerOptions: { persistAuthorization: true },
 }));
 app.get('/api/v1/docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+app.get('/api/v1/spec', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });

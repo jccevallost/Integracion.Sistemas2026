@@ -1,187 +1,249 @@
-# Vuelos API — Backend
+# Vuelos API - Backend
 
-API REST para el módulo de vuelos. Construida con **Express + Prisma + PostgreSQL + TypeScript**.
+API REST para el modulo de vuelos de la plataforma academica Booking. Esta construida con Express, Prisma, PostgreSQL y TypeScript.
 
----
-
-## 🚀 Instalación y arranque
+## Instalacion y arranque
 
 ### 1. Instalar dependencias
+
 ```bash
 npm install
 ```
 
 ### 2. Configurar variables de entorno
-```bash
-cp .env.example .env
-```
-Edita `.env` y completa `DATABASE_URL` con tu string de conexión de Supabase (u otra instancia PostgreSQL).
 
-### 3. Generar el cliente Prisma
+El proyecto espera estas variables principales:
+
+```env
+DATABASE_URL="postgresql://..."
+JWT_SECRET="..."
+JWT_ISSUER="vuelos-api"
+JWT_AUDIENCE="vuelos-client"
+JWT_EXPIRES_IN="2h"
+PORT=3000
+FRONTEND_URL="http://localhost:4200"
+```
+
+### 3. Generar cliente Prisma
+
 ```bash
 npm run db:generate
 ```
 
-### 4. Ejecutar migraciones
+### 4. Ejecutar migraciones o sincronizar schema
+
 ```bash
 npm run db:migrate
 ```
-> Si prefieres no usar migraciones y solo sincronizar el schema:
-> ```bash
-> npm run db:push
-> ```
+
+Para sincronizar sin migraciones:
+
+```bash
+npm run db:push
+```
 
 ### 5. Cargar datos de prueba
+
 ```bash
 npm run db:seed
 ```
-Esto crea aerolíneas, aeropuertos, rutas, vuelos y usuarios de prueba.
 
-**Credenciales de prueba:**
-| Rol | Email | Password |
-|-----|-------|----------|
-| Admin | admin@vuelosapp.com | admin123 |
-| Cliente | cliente@gmail.com | cliente123 |
+El seed crea aerolineas, aeropuertos, rutas, vuelos, usuarios y catalogos base para probar el marketplace y el panel administrativo.
 
 ### 6. Iniciar en desarrollo
+
 ```bash
 npm run dev
 ```
-El servidor corre en `http://localhost:3800`.
 
----
+Por defecto el servidor corre en `http://localhost:3000`, salvo que `.env` defina otro `PORT`.
 
-## 📋 Contrato OpenAPI (sección 1.4 teoría)
+## Contrato OpenAPI
 
-El archivo `openapi.yaml` es la **fuente de verdad** del sistema. Define todos los endpoints, schemas y respuestas.
+El archivo `openapi.yaml` documenta el contrato REST publico del sistema. El backend tambien expone una especificacion generada desde Swagger/JSDoc.
 
-### Ver la spec en vivo
-```bash
-# Arranca el servidor y abre en Swagger Editor
-npm run dev
-# Luego visita: https://editor.swagger.io/?url=http://localhost:3800/api/v1/spec
+Endpoints de documentacion:
+
+- Swagger UI local: `http://localhost:3000/api/v1/docs`
+- JSON local: `http://localhost:3000/api/v1/docs.json`
+- Alias compatible: `http://localhost:3000/api/v1/spec`
+- Produccion: `https://integracion-sistemas2026.onrender.com/api/v1/docs`
+
+Para importar en Postman usa:
+
+```text
+http://localhost:3000/api/v1/docs.json
 ```
 
-### Importar en Postman
-1. Postman → Import → Link
-2. Pega: `http://localhost:3800/api/v1/spec`
+Nota importante: OpenAPI solo debe declarar endpoints REST reales. gRPC, GraphQL, eventos y SOA estan documentados como evolucion arquitectonica en `docs/documento-tecnico-reto1.md`; no se agregan como rutas productivas hasta que exista implementacion, para no romper pruebas del frontend.
 
----
+## Endpoints principales
 
-## 📡 Endpoints principales (prefijo `/api/v1/`)
+Todas las rutas publicas versionadas usan el prefijo `/api/v1`.
 
-### Autenticación
-```
-POST   /api/v1/auth/register          Registrar nuevo usuario
-POST   /api/v1/auth/login             Iniciar sesión → devuelve JWT
-GET    /api/v1/auth/me                Perfil del usuario (requiere token)
-PUT    /api/v1/auth/profile           Actualizar perfil (requiere token)
-POST   /api/v1/auth/change-password   Cambiar contraseña (requiere token)
+### Autenticacion
+
+```text
+POST   /api/v1/auth/register
+POST   /api/v1/auth/login
+GET    /api/v1/auth/me
+POST   /api/v1/auth/change-password
 ```
 
 ### Vuelos
-```
-GET    /api/v1/flights/search         Buscar vuelos disponibles
-  ?origin=UIO
-  &destination=BOG
-  &date=2025-04-01
-  &passengers=2
-  &class=ECONOMY
 
-GET    /api/flights                Listar todos los vuelos
-GET    /api/v1/flights/:id            Detalle de un vuelo
-POST   /api/flights                Crear vuelo (admin)
-PUT    /api/v1/flights/:id            Actualizar vuelo (admin)
-DELETE /api/v1/flights/:id            Eliminar vuelo (admin)
+```text
+GET    /api/v1/flights/search
+GET    /api/v1/flights
+GET    /api/v1/flights/:id
+POST   /api/v1/flights
+PUT    /api/v1/flights/:id
+PATCH  /api/v1/flights/:id
+DELETE /api/v1/flights/:id
+```
+
+Parametros principales de busqueda:
+
+```text
+origin=UIO
+destination=BOG
+date=2026-05-01
+passengers=2
+class=ECONOMY
 ```
 
 ### Reservas
-```
-POST   /api/reservations           Crear reserva (autenticado)
-GET    /api/v1/reservations/my        Mis reservas (autenticado)
-GET    /api/v1/reservations/:id       Detalle de reserva (autenticado)
-DELETE /api/v1/reservations/:id       Cancelar reserva (autenticado)
-GET    /api/reservations           Todas las reservas (admin)
+
+```text
+POST   /api/v1/reservations
+GET    /api/v1/reservations/my
+GET    /api/v1/reservations/:id
+PATCH  /api/v1/reservations/:id/cancel
+PATCH  /api/v1/reservations/:id/passengers/:passengerId/seat
+GET    /api/v1/reservations
 ```
 
-### Promociones
-```
-POST   /api/v1/promotions/validate    Validar cupón (público)
-GET    /api/promotions             Listar promociones (admin)
-POST   /api/promotions             Crear promoción (admin)
-PUT    /api/v1/promotions/:id         Actualizar (admin)
-DELETE /api/v1/promotions/:id         Eliminar (admin)
+### Servicios adicionales, check-in y pagos
+
+```text
+GET    /api/v1/service-catalog
+GET    /api/v1/airline-service-config
+GET    /api/v1/airline-service-config/by-airline/:airlineId
+POST   /api/v1/passenger-services
+GET    /api/v1/passenger-services/by-passenger/:passengerId
+DELETE /api/v1/passenger-services/:id
+POST   /api/v1/boarding-passes
+GET    /api/v1/boarding-passes/by-passenger/:passengerId
+POST   /api/v1/payments
+GET    /api/v1/payments/by-reservation/:reservationId
+POST   /api/v1/invoices
 ```
 
-### Admin — Gestión de catálogos
+### Administracion
+
+```text
+GET    /api/v1/admin/dashboard
+CRUD   /api/v1/admin/users
+CRUD   /api/v1/admin/countries
+CRUD   /api/v1/admin/cities
+CRUD   /api/v1/admin/airports
+CRUD   /api/v1/admin/airlines
+CRUD   /api/v1/admin/aircraft
+CRUD   /api/v1/admin/flightclasses
+CRUD   /api/v1/admin/segments
+CRUD   /api/v1/admin/reservations
+CRUD   /api/v1/admin/servicecatalog
+CRUD   /api/v1/admin/airline-service-config
+CRUD   /api/v1/admin/passenger-services
+CRUD   /api/v1/admin/payments
+CRUD   /api/v1/admin/invoices
+CRUD   /api/v1/admin/invoice-items
+CRUD   /api/v1/admin/boarding-passes
+CRUD   /api/v1/admin/auditlogs
 ```
-GET/POST/PUT/DELETE  /api/v1/admin/airports    Aeropuertos
-GET/POST/PUT/DELETE  /api/v1/admin/airlines    Aerolíneas
-GET/POST/PUT/DELETE  /api/v1/admin/routes      Rutas
-GET/PUT/DELETE       /api/v1/admin/users       Usuarios
-```
 
----
+## Formato de respuestas
 
-## 📋 Formato de respuestas
+Exito:
 
-**Éxito:**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": {}
 }
 ```
 
-**Error:**
+Error:
+
 ```json
 {
   "success": false,
   "error": {
     "code": "NOT_FOUND",
-    "message": "Vuelo no encontrado"
+    "message": "Recurso no encontrado"
   }
 }
 ```
 
----
+## Seguridad y trazabilidad
 
-## 🔐 Autenticación
+Las rutas protegidas requieren:
 
-Todas las rutas protegidas requieren el header:
-```
+```http
 Authorization: Bearer <token>
 ```
 
-El token se obtiene en `POST /api/auth/login`.
+El token se obtiene con `POST /api/v1/auth/login`.
 
----
+El backend acepta `x-correlation-id` en cada request. Si el cliente no lo envia, se genera uno automaticamente y se devuelve como `X-Correlation-Id`. Este identificador se usa en la propuesta de trazabilidad de eventos.
 
-## 🗂️ Estructura del proyecto
+Controles activos:
 
+- CORS con allowlist de origenes permitidos.
+- `credentials: false` porque la API usa Bearer token, no cookies.
+- Headers de seguridad con Helmet.
+- Rate limiting global, en login/registro y busqueda de vuelos.
+- JWT firmado con `HS256`, `issuer`, `audience` y expiracion configurable.
+- En produccion `JWT_SECRET` debe tener al menos 32 caracteres.
+- Validacion de entrada con Zod.
+- Verificacion de ownership en reservas, pagos, facturas, perfiles, pasajeros y boarding passes.
+- `Cache-Control: no-store` en respuestas `/api`.
+
+Recomendacion de produccion:
+
+```env
+JWT_SECRET="usa-un-secreto-aleatorio-de-64-caracteres-o-mas"
+JWT_EXPIRES_IN="2h"
 ```
+
+## Estructura del proyecto
+
+```text
 src/
-├── config/
-│   └── prisma.ts              Cliente Prisma singleton
-├── modules/
-│   ├── auth/                  Registro, login, perfil
-│   ├── flights/               Búsqueda y gestión de vuelos
-│   ├── reservations/          Flujo de reservas
-│   ├── promotions/            Cupones y descuentos
-│   └── admin/                 Panel administrador
-├── shared/
-│   ├── middleware/
-│   │   └── auth.middleware.ts JWT + guards de rol
-│   └── utils/
-│       ├── response.ts        Helpers de respuesta HTTP
-│       └── generic.controller.ts Factory CRUD
-└── server.ts                  Punto de entrada
+  config/                 Cliente Prisma
+  modules/                Modulos por dominio/API
+    api_users/
+    api_flights/
+    api_reservations/
+    api_passenger_services/
+    api_payments/
+    api_admin/
+  shared/
+    middlewares/
+    utils/
+    swagger.ts
+    swagger-paths.ts
+  server.ts
+prisma/
+  schema.prisma
+  seed.ts
 ```
 
----
+## Evolucion a integracion
 
-## 🔄 Evolución a microservicios (Reto 2)
+El Reto 1 mantiene una arquitectura de monolito modular API-first. La evolucion a microservicios no cambia el contrato REST publico; cambia la infraestructura interna.
 
-Cada carpeta dentro de `modules/` está diseñada para convertirse en un microservicio independiente.
-El contrato de la API (endpoints y formato de respuesta) NO cambia en el Reto 2 —
-solo cambia la infraestructura que lo atiende.
+Documentacion relacionada:
+
+- `docs/diagramas-secuencia-grpc.md`: diagramas de secuencia y contratos proto3 sugeridos.
+- `docs/documento-tecnico-reto1.md`: analisis gRPC, GraphQL, SOA, mensajeria, catalogo de eventos y trazabilidad hasta semana 6.

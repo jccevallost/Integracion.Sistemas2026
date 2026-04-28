@@ -4,6 +4,8 @@ Este documento sirve como base para explicar los flujos principales del sistema 
 
 La idea recomendada es mantener REST/JSON como contrato publico para Angular y futuros consumidores web, y usar gRPC solo entre servicios internos.
 
+El analisis completo de gRPC, GraphQL, SOA, mensajeria, eventos de negocio y trazabilidad esta en `docs/documento-tecnico-reto1.md`.
+
 ## Vista objetivo
 
 ```mermaid

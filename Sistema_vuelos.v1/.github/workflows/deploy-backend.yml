@@ -1,40 +1,69 @@
-name: Deploy Backend to Azure App Service
+name: Build and deploy Node.js app to Azure Web App - vuelos-api
 
 on:
   push:
     branches: [main]
     paths:
-      - 'vuelos-backend/**'
+      - 'Sistema_vuelos.v1/vuelos-backend/**'
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: vuelos-backend
+        working-directory: Sistema_vuelos.v1/vuelos-backend
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.x'
           cache: 'npm'
-          cache-dependency-path: vuelos-backend/package-lock.json
+          cache-dependency-path: Sistema_vuelos.v1/vuelos-backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (Prisma generate + TypeScript)
+      - name: Build (Prisma + TypeScript)
         run: npm run build
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Deploy to Azure App Service
+      - name: Install production dependencies only
+        run: npm ci --omit=dev
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: Sistema_vuelos.v1/vuelos-backend
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_4095487AC7FA4D4E8FDB07A2032E0E7D }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_0E69527DD60445F98438AA4F6971A873 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_03103F7CB7FF4A3FA7027C0C1336B5E3 }}
+
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          package: ./vuelos-backend
+          app-name: 'vuelos-api'
+          slot-name: 'Production'
+          package: .

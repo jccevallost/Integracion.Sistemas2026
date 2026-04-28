@@ -21,7 +21,7 @@ export class BillingProfileController {
 
   listByUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = String(req.params.userId) ?? (req as any).user?.id;
+      const userId = req.params.userId ? String(req.params.userId) : (req as any).user?.id;
       const data = await this.service.findByUser(userId);
       res.json({ success: true, data });
     } catch (err) { next(err); }
