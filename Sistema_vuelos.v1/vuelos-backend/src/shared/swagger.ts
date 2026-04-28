@@ -24,6 +24,7 @@ const options: swaggerJsdoc.Options = {
           scheme:       'bearer',
           bearerFormat: 'JWT',
           description:  'JWT obtenido en POST /auth/login',
+
         },
       },
       schemas: {
@@ -457,6 +458,28 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+
+      //Futuras Apis
+      // ── Proyección Booking / Microservicios ──────────────────
+        Accommodation: {
+          type: 'object',
+          properties: {
+            id:         { type: 'string', format: 'uuid' },
+            hotelName:  { type: 'string', example: 'Hilton Colon Quito' },
+            roomType:   { type: 'string', example: 'Executive Suite' },
+            stars:      { type: 'integer', example: 5 },
+          }
+        },
+        BundleBooking: {
+          type: 'object',
+          properties: {
+            bookingReference: { type: 'string', example: 'BK-2026-XYZ' },
+            flightReservationId: { type: 'string', format: 'uuid' },
+            accommodationId: { type: 'string', format: 'uuid', nullable: true },
+            carRentalId: { type: 'string', format: 'uuid', nullable: true },
+            totalPackagePrice: { type: 'number', example: 450.50 }
+          }
+        },
     },
     tags: [
       { name: 'Auth',                    description: 'Autenticación y perfil de usuario' },
@@ -482,6 +505,9 @@ const options: swaggerJsdoc.Options = {
       { name: 'Service Catalog',         description: 'Catálogo de servicios — api_service_catalog' },
       { name: 'Audit Logs',              description: 'Auditoría — api_audit_logs' },
       { name: 'Admin',                   description: 'Panel de administración (requiere rol ADMIN)' },
+      { name: '🏨 Accommodation Engine',   description: 'PRÓXIMAMENTE: Integración con inventario de hoteles y hospedaje.' },
+      { name: '🚗 Mobility & Rentals',    description: 'PRÓXIMAMENTE: Gestión de alquiler de vehículos y traslados.' },
+      { name: '📦 Booking Orchestrator',  description: 'PRÓXIMAMENTE: Microservicio para paquetes dinámicos (Vuelo + Hotel).' },
     ],
   },
   // swagger-jsdoc extrae los endpoints desde comentarios @openapi.
