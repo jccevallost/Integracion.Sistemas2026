@@ -1,0 +1,446 @@
+// ============================================================
+// CONFIGURACIÓN DE GENERADOR Y CONEXIÓN
+// ============================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS (TIPOS DE DATOS)
+// ============================================================
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum FlightStatus {
+  SCHEDULED
+  DELAYED
+  CANCELLED
+  COMPLETED
+}
+
+enum CabinClass {
+  ECONOMY // Turista
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// ============================================================
+// GEOGRAFÍA (CATÁLOGOS NORMALIZADOS)
+// ============================================================
+
+model Country {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  isoCode      String  @unique @map("iso_code") // Ej: EC, US
+  phoneCode    String? @map("phone_code")
+  currencyCode String? @map("currency_code")
+
+  cities   City[]
+  airlines Airline[]
+
+  @@map("countries")
+}
+
+model City {
+  id        String  @id @default(cuid())
+  name      String
+  countryId String  @map("country_id")
+  iataCode  String? @unique @map("iata_code")
+
+  country         Country          @relation(fields: [countryId], references: [id])
+  airports        Airport[]
+  users           User[]
+  billingProfiles BillingProfile[]
+
+  @@map("cities")
+}
+
+// ============================================================
+// USUARIOS (NOMBRES ATÓMICOS Y DIRECCIONES)
+// ============================================================
+
+model User {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String @map("password_hash")
+
+  // Nombres normalizados para Seguridad Aérea
+  firstName      String  @map("first_name")
+  secondName     String? @map("second_name")
+  firstLastName  String  @map("first_last_name")
+  secondLastName String? @map("second_last_name")
+
+  // Ubicación Principal
+  mainAddress      String  @map("main_address")
+  secondaryAddress String? @map("secondary_address")
+  cityId           String  @map("city_id")
+
+  phone        String?
+  birthDate    DateTime? @map("birth_date")
+  role         UserRole  @default(CUSTOMER)
+  isActive     Boolean   @default(true) @map("is_active")
+  tokenVersion Int       @default(0) @map("token_version")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  city            City             @relation(fields: [cityId], references: [id])
+  reservations    Reservation[]
+  billingProfiles BillingProfile[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+// ============================================================
+// FISCALIDAD (PERFILES Y FACTURACIÓN INMUTABLE)
+// ============================================================
+
+model BillingProfile {
+  id           String  @id @default(cuid())
+  userId       String  @map("user_id")
+  taxId        String  @map("tax_id") // RUC o Cédula
+  businessName String  @map("business_name")
+  email        String?
+  address      String
+  cityId       String  @map("city_id")
+  isDefault    Boolean @default(false) @map("is_default")
+
+  user     User      @relation(fields: [userId], references: [id])
+  city     City      @relation(fields: [cityId], references: [id])
+  invoices Invoice[]
+
+  @@map("billing_profiles")
+}
+
+model Invoice {
+  id               String @id @default(cuid())
+  paymentId        String @unique @map("payment_id")
+  billingProfileId String @map("billing_profile_id")
+  invoiceNumber    String @unique @map("invoice_number")
+
+  subtotal  Decimal  @db.Decimal(10, 2)
+  taxAmount Decimal  @map("tax_amount") @db.Decimal(10, 2) // IVA 15%
+  total     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  payment        Payment        @relation(fields: [paymentId], references: [id])
+  billingProfile BillingProfile @relation(fields: [billingProfileId], references: [id])
+  items          InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String  @map("invoice_id")
+  description String // "Boleto UIO-MAD (Pasajero: X)" o "Maleta 23kg"
+  quantity    Int     @default(1)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(10, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_items")
+}
+
+// ============================================================
+// INFRAESTRUCTURA Y VUELOS (CAMBIO DE AERONAVE POR TRAMO)
+// ============================================================
+
+model Airport {
+  id       String @id @default(cuid())
+  iataCode String @unique @map("iata_code")
+  name     String
+  cityId   String @map("city_id")
+  timezone String
+
+  city                City             @relation(fields: [cityId], references: [id])
+  originSegments      Segment[]        @relation("OriginAirport")
+  destinationSegments Segment[]        @relation("DestinationAirport")
+  airlineAirports     AirlineAirport[]
+
+  @@map("airports")
+}
+
+model Airline {
+  id        String  @id @default(cuid())
+  iataCode  String  @unique @map("iata_code")
+  name      String
+  logoUrl   String? @map("logo_url")
+  countryId String  @map("country_id")
+
+  country         Country                @relation(fields: [countryId], references: [id])
+  segments        Segment[]
+  aircrafts       Aircraft[]
+  serviceConfigs  AirlineServiceConfig[]
+  airlineAirports AirlineAirport[]
+
+  @@map("airlines")
+}
+
+model Aircraft {
+  id           String  @id @default(cuid())
+  airlineId    String  @map("airline_id")
+  modelName    String  @map("model_name")
+  registration String  @unique
+  hasWifi      Boolean @default(false) @map("has_wifi")
+  hasUsb       Boolean @default(false) @map("has_usb")
+
+  airline  Airline   @relation(fields: [airlineId], references: [id])
+  segments Segment[]
+
+  @@map("aircrafts")
+}
+
+model AirlineAirport {
+  airlineId String @map("airline_id")
+  airportId String @map("airport_id")
+
+  airline Airline @relation(fields: [airlineId], references: [id])
+  airport Airport @relation(fields: [airportId], references: [id])
+
+  @@id([airlineId, airportId])
+  @@map("airline_airports")
+}
+
+model Flight {
+  id                     String       @id @default(cuid())
+  originAirportIata      String       @map("origin_airport_iata")
+  destinationAirportIata String       @map("destination_airport_iata")
+  departureDate          DateTime     @map("departure_date")
+  status                 FlightStatus @default(SCHEDULED)
+
+  segments      Segment[]
+  flightClasses FlightClass[]
+  reservations  Reservation[]
+
+  @@index([departureDate, originAirportIata, destinationAirportIata])
+  @@map("flights")
+}
+
+model Segment {
+  id                   String   @id @default(cuid())
+  segmentNumber        String   @map("segment_number")
+  originAirportId      String   @map("origin_airport_id")
+  destinationAirportId String   @map("destination_airport_id")
+  departureDateTime    DateTime @map("departure_datetime")
+  arrivalDateTime      DateTime @map("arrival_datetime")
+  airlineId            String   @map("airline_id")
+  aircraftId           String?  @map("aircraft_id")
+  estimatedDuration    Int      @map("estimated_duration")
+
+  flightId           String?        @map("flight_id")
+  flight             Flight?        @relation(fields: [flightId], references: [id])
+  originAirport      Airport        @relation("OriginAirport", fields: [originAirportId], references: [id])
+  destinationAirport Airport        @relation("DestinationAirport", fields: [destinationAirportId], references: [id])
+  airline            Airline        @relation(fields: [airlineId], references: [id])
+  aircraft           Aircraft?      @relation(fields: [aircraftId], references: [id])
+  boardingPasses     BoardingPass[]
+
+  @@map("segments")
+}
+
+// ============================================================
+// CATÁLOGO DE SERVICIOS DINÁMICO (PRECIOS POR AEROLÍNEA/RUTA)
+// ============================================================
+
+model ServiceCatalog {
+  id          String  @id @default(cuid())
+  name        String // Ej: "Maleta de Bodega 23kg"
+  code        String  @unique // Ej: "BAG_23KG"
+  category    String
+  description String?
+
+  airlineConfigs AirlineServiceConfig[]
+
+  @@map("service_catalog")
+}
+
+model AirlineServiceConfig {
+  id              String  @id @default(cuid())
+  serviceId       String  @map("service_id")
+  airlineId       String  @map("airline_id")
+  originAirportId String? @map("origin_airport_id") // Opcional para precios por ruta
+  destAirportId   String? @map("dest_airport_id")
+
+  price    Decimal @db.Decimal(10, 2)
+  currency String  @default("USD")
+
+  service           ServiceCatalog     @relation(fields: [serviceId], references: [id])
+  airline           Airline            @relation(fields: [airlineId], references: [id])
+  passengerServices PassengerService[]
+
+  @@map("airline_service_configs")
+}
+
+// ============================================================
+// RESERVAS, PASAJEROS Y PAGOS
+// ============================================================
+
+model Reservation {
+  id              String            @id @default(cuid())
+  userId          String            @map("user_id")
+  flightId        String            @map("flight_id")
+  promotionId     String?           @map("promotion_id")
+  reservationCode String            @unique @map("reservation_code")
+  totalAmount     Decimal           @map("total_amount") @db.Decimal(10, 2)
+  status          ReservationStatus @default(PENDING)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  user       User                   @relation(fields: [userId], references: [id])
+  flight     Flight                 @relation(fields: [flightId], references: [id])
+  promotion  Promotion?             @relation(fields: [promotionId], references: [id])
+  payment    Payment?
+  passengers ReservationPassenger[]
+
+  @@map("reservations")
+}
+
+model FlightClass {
+  id             String     @id @default(cuid())
+  flightId       String     @map("flight_id")
+  cabinClass     CabinClass @map("cabin_class")
+  availableSeats Int        @map("available_seats")
+  basePrice      Decimal    @map("base_price") @db.Decimal(10, 2)
+
+  flight                Flight                 @relation(fields: [flightId], references: [id])
+  reservationPassengers ReservationPassenger[]
+
+  @@unique([flightId, cabinClass])
+  @@map("flight_classes")
+}
+
+model ReservationPassenger {
+  id             String  @id @default(cuid())
+  reservationId  String  @map("reservation_id")
+  flightClassId  String  @map("flight_class_id")
+  firstName      String  @map("first_name")
+  lastName       String  @map("last_name")
+  documentNumber String  @map("document_number")
+  seatNumber     String? @map("seat_number")
+
+  reservation    Reservation        @relation(fields: [reservationId], references: [id])
+  flightClass    FlightClass        @relation(fields: [flightClassId], references: [id])
+  extraServices  PassengerService[]
+  boardingPasses BoardingPass[]
+
+  @@map("reservation_passengers")
+}
+
+model PassengerService {
+  id                 String  @id @default(cuid())
+  passengerId        String  @map("passenger_id")
+  serviceConfigId    String  @map("service_config_id")
+  quantity           Int     @default(1)
+  unitPriceAtBooking Decimal @map("unit_price_at_booking") @db.Decimal(10, 2)
+
+  passenger     ReservationPassenger @relation(fields: [passengerId], references: [id])
+  serviceConfig AirlineServiceConfig @relation(fields: [serviceConfigId], references: [id])
+
+  @@map("passenger_services")
+}
+
+// ============================================================
+// MARKETING Y PAGOS
+// ============================================================
+
+model Promotion {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
+  maxUsages     Int?         @map("max_usages")
+  currentUsages Int          @default(0) @map("current_usages")
+  isActive      Boolean      @default(true) @map("is_active")
+
+  reservations Reservation[]
+
+  @@map("promotions")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  reservationId String   @unique @map("reservation_id")
+  amount        Decimal  @db.Decimal(10, 2)
+  provider      String
+  transactionId String   @map("transaction_id")
+  status        String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  invoice     Invoice?
+
+  @@map("payments")
+}
+
+// ============================================================
+// MÓDULO DE CHECK-IN Y PASES DE ABORDAR
+// ============================================================
+
+enum CheckInStatus {
+  NOT_CHECKED_IN
+  CHECKED_IN
+  BOARDED
+  NO_SHOW
+}
+
+model BoardingPass {
+  id          String @id @default(cuid())
+  passengerId String @unique @map("passenger_id")
+  segmentId   String @map("segment_id") // El pase es por tramo
+
+  boardingCode  String        @unique @map("boarding_code") // El código para el QR
+  gate          String? // Puerta de embarque (se actualiza el día del vuelo)
+  boardingGroup String?       @map("boarding_group") // Ej: "Grupo A"
+  checkInAt     DateTime?     @map("check_in_at")
+  status        CheckInStatus @default(NOT_CHECKED_IN)
+
+  passenger ReservationPassenger @relation(fields: [passengerId], references: [id])
+  segment   Segment              @relation(fields: [segmentId], references: [id])
+
+  @@map("boarding_passes")
+}
+
+// ============================================================
+// SISTEMA DE AUDITORÍA Y REGISTRO DE ACTIVIDAD
+// ============================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id") // Quién hizo el cambio
+  action    String // CREATE, UPDATE, DELETE, LOGIN, PAY
+  entity    String // La tabla afectada (Ej: "Reservation", "Flight")
+  entityId  String   @map("entity_id") // El ID del registro afectado
+  oldData   Json?    @map("old_data") // Valor antes del cambio
+  newData   Json?    @map("new_data") // Valor después del cambio
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}

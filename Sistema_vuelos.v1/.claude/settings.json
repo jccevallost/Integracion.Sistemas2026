@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Read(//c/Users/**)",
+      "Bash(git push *)",
+      "Bash(gh run *)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); proj=list\\(d['projects'].keys\\(\\)\\)[0]; print\\('outputPath:', d['projects'][proj]['architect']['build']['options'].get\\('outputPath','N/A'\\)\\)\")",
+      "Bash(git -C \"c:/Users/Asus_G16/Documents/Integracion Sistemas\" add \"Sistema_vuelos.v1/vuelos-angular/src/app/pages/admin/flight-classes/admin-flight-classes.component.ts\" \"Sistema_vuelos.v1/vuelos-angular/src/app/pages/admin/flights/admin-flights.component.ts\" \"Sistema_vuelos.v1/vuelos-angular/src/app/pages/admin/invoice-items/admin-invoice-items.component.ts\")",
+      "Bash(git -C 'c:/Users/Asus_G16/Documents/Integracion Sistemas' commit -m ' *)",
+      "Bash(git -C \"c:/Users/Asus_G16/Documents/Integracion Sistemas\" push origin main)"
+    ]
+  }
+}

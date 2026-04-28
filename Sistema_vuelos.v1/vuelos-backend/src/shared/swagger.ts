@@ -484,10 +484,10 @@ const options: swaggerJsdoc.Options = {
       { name: 'Admin',                   description: 'Panel de administración (requiere rol ADMIN)' },
     ],
   },
-  // En producción lee los .js compilados; en desarrollo los .ts fuente
-  apis: process.env.NODE_ENV === 'production'
-    ? ['./dist/shared/swagger-paths.js']
-    : ['./src/shared/swagger-paths.ts'],
+  // swagger-jsdoc extrae los endpoints desde comentarios @openapi.
+  // El build de TypeScript no conserva esos bloques en dist/swagger-paths.js,
+  // por eso se escanea también el archivo fuente desplegado por Render.
+  apis: ['./src/shared/swagger-paths.ts', './dist/shared/swagger-paths.js'],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

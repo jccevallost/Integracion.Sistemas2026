@@ -1236,6 +1236,40 @@
  *                 data:
  *                   type: array
  *                   items: { $ref: '#/components/schemas/ReservationPassenger' }
+ *   post:
+ *     tags: [Reservation Passengers]
+ *     summary: Crear pasajero de reserva (Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reservationId, flightClassId, firstName, lastName, documentNumber]
+ *             properties:
+ *               reservationId:  { type: string, format: uuid }
+ *               flightClassId:  { type: string, format: uuid }
+ *               firstName:      { type: string, example: Juan }
+ *               lastName:       { type: string, example: Perez }
+ *               documentNumber: { type: string, example: "A1234567" }
+ *               seatNumber:     { type: string, nullable: true, example: "12A" }
+ *     responses:
+ *       201:
+ *         description: Pasajero creado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data: { $ref: '#/components/schemas/ReservationPassenger' }
+ *       400:
+ *         description: Campos requeridos faltantes
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ValidationErrorResponse' }
  *
  * /reservation-passengers/by-reservation/{reservationId}:
  *   get:
@@ -1259,42 +1293,6 @@
  *                 data:
  *                   type: array
  *                   items: { $ref: '#/components/schemas/ReservationPassenger' }
- *
- * /reservation-passengers:
- *   post:
- *     tags: [Reservation Passengers]
- *     summary: Crear pasajero de reserva (Admin)
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reservationId, flightClassId, firstName, lastName, documentNumber]
- *             properties:
- *               reservationId:  { type: string, format: uuid }
- *               flightClassId:  { type: string, format: uuid }
- *               firstName:      { type: string, example: Juan }
- *               lastName:       { type: string, example: Pérez }
- *               documentNumber: { type: string, example: "A1234567" }
- *               seatNumber:     { type: string, nullable: true, example: "12A" }
- *     responses:
- *       201:
- *         description: Pasajero creado
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   properties:
- *                     data: { $ref: '#/components/schemas/ReservationPassenger' }
- *       400:
- *         description: Campos requeridos faltantes
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ValidationErrorResponse' }
  *
  * /reservation-passengers/{id}:
  *   get:
