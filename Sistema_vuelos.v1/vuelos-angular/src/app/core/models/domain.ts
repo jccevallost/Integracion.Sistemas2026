@@ -1,6 +1,6 @@
 // core/models/domain.ts — espejo del schema Prisma del backend
 
-export type UserRole          = 'CUSTOMER' | 'ADMIN';
+export type UserRole          = 'CUSTOMER' | 'ADMIN' | 'SERVICE';
 export type FlightStatus      = 'SCHEDULED' | 'DELAYED' | 'CANCELLED' | 'COMPLETED';
 export type CabinClass        = 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST';
 export type ClassType         = CabinClass;
@@ -61,7 +61,8 @@ export interface Flight {
 }
 export interface Passenger {
   id?: string; firstName: string; lastName: string;
-  documentNumber: string; seatNumber?: string | null;
+  documentNumber: string; flightClassId?: string;
+  seatNumber?: string | null;
 }
 export interface Promotion {
   id: string; code: string; discountType: DiscountType;

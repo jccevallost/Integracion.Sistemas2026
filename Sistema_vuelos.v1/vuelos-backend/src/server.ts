@@ -62,6 +62,7 @@ import { createReservationPassengerRouter }  from './modules/api_reservation_pas
 import { createAuditLogRouter }              from './modules/api_audit_logs/routes/audit-logs.routes.js';
 import { errorHandler }                      from './shared/middlewares/error.middleware.js';
 import { validateJwtConfig }                 from './shared/security/jwt.config.js';
+import { startGrpcServer }                   from './grpc/grpc.server.js';
 
 // ============================================================
 //                        APP SETUP
@@ -69,6 +70,32 @@ import { validateJwtConfig }                 from './shared/security/jwt.config.
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
+const DB_CONNECT_MAX_ATTEMPTS = Number(process.env.DB_CONNECT_MAX_ATTEMPTS) || 5;
+const DB_CONNECT_RETRY_MS = Number(process.env.DB_CONNECT_RETRY_MS) || 2000;
+let grpcServer: Awaited<ReturnType<typeof startGrpcServer>> | undefined;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function connectToDatabaseWithRetry() {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DB_CONNECT_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await prisma.$connect();
+      if (attempt > 1) {
+        console.log(`Conexion a PostgreSQL recuperada en intento ${attempt}/${DB_CONNECT_MAX_ATTEMPTS}`);
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === DB_CONNECT_MAX_ATTEMPTS) break;
+      console.warn(`Conexion a PostgreSQL fallo en intento ${attempt}/${DB_CONNECT_MAX_ATTEMPTS}. Reintentando en ${DB_CONNECT_RETRY_MS}ms...`);
+      await sleep(DB_CONNECT_RETRY_MS);
+    }
+  }
+
+  throw lastError;
+}
 
 validateJwtConfig();
 app.disable('x-powered-by');
@@ -278,8 +305,11 @@ app.use(errorHandler);
 
 async function startServer() {
   try {
-    await prisma.$connect();
+    await connectToDatabaseWithRetry();
     console.log('✅ Conectado a PostgreSQL');
+
+    const GRPC_PORT = Number(process.env.GRPC_PORT) || 50051;
+    grpcServer = await startGrpcServer(GRPC_PORT);
 
     app.listen(PORT, () => {
       console.log(`\n🚀 Vuelos API — http://localhost:${PORT}`);
@@ -315,8 +345,27 @@ async function startServer() {
   }
 }
 
-process.on('SIGINT',  async () => { await prisma.$disconnect(); process.exit(0); });
-process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+async function stopGrpcServer() {
+  if (!grpcServer) return;
+
+  await new Promise<void>((resolve) => {
+    grpcServer?.tryShutdown((error) => {
+      if (error) grpcServer?.forceShutdown();
+      resolve();
+    });
+  });
+
+  grpcServer = undefined;
+}
+
+async function shutdown() {
+  await stopGrpcServer();
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
+process.on('SIGINT',  () => { void shutdown(); });
+process.on('SIGTERM', () => { void shutdown(); });
 process.on('uncaughtException',   (err) => { console.error('❌ Excepción no capturada:', err); process.exit(1); });
 process.on('unhandledRejection',  (r)   => { console.error('❌ Promesa rechazada:', r); process.exit(1); });
 

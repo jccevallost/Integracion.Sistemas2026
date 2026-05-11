@@ -3,14 +3,16 @@
 // ============================================================
 
 generator client {
-  provider      = "prisma-client-js"
-  output        = "../prisma-client"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  output          = "../prisma-client"
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "identity", "catalog", "booking", "payments", "checkin", "audit"]
 }
 
 // ============================================================
@@ -20,6 +22,9 @@ datasource db {
 enum UserRole {
   CUSTOMER
   ADMIN
+  SERVICE
+
+  @@schema("public")
 }
 
 enum FlightStatus {
@@ -27,6 +32,8 @@ enum FlightStatus {
   DELAYED
   CANCELLED
   COMPLETED
+
+  @@schema("public")
 }
 
 enum CabinClass {
@@ -34,17 +41,23 @@ enum CabinClass {
   PREMIUM_ECONOMY
   BUSINESS
   FIRST
+
+  @@schema("public")
 }
 
 enum ReservationStatus {
   PENDING
   CONFIRMED
   CANCELLED
+
+  @@schema("public")
 }
 
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
+
+  @@schema("public")
 }
 
 // ============================================================
@@ -62,6 +75,7 @@ model Country {
   airlines Airline[]
 
   @@map("countries")
+  @@schema("catalog")
 }
 
 model City {
@@ -76,6 +90,7 @@ model City {
   billingProfiles BillingProfile[]
 
   @@map("cities")
+  @@schema("catalog")
 }
 
 // ============================================================
@@ -112,6 +127,7 @@ model User {
   auditLogs       AuditLog[]
 
   @@map("users")
+  @@schema("identity")
 }
 
 // ============================================================
@@ -133,6 +149,7 @@ model BillingProfile {
   invoices Invoice[]
 
   @@map("billing_profiles")
+  @@schema("payments")
 }
 
 model Invoice {
@@ -151,6 +168,7 @@ model Invoice {
   items          InvoiceItem[]
 
   @@map("invoices")
+  @@schema("payments")
 }
 
 model InvoiceItem {
@@ -164,6 +182,7 @@ model InvoiceItem {
   invoice Invoice @relation(fields: [invoiceId], references: [id])
 
   @@map("invoice_items")
+  @@schema("payments")
 }
 
 // ============================================================
@@ -183,6 +202,7 @@ model Airport {
   airlineAirports     AirlineAirport[]
 
   @@map("airports")
+  @@schema("catalog")
 }
 
 model Airline {
@@ -199,6 +219,7 @@ model Airline {
   airlineAirports AirlineAirport[]
 
   @@map("airlines")
+  @@schema("catalog")
 }
 
 model Aircraft {
@@ -213,6 +234,7 @@ model Aircraft {
   segments Segment[]
 
   @@map("aircrafts")
+  @@schema("catalog")
 }
 
 model AirlineAirport {
@@ -224,6 +246,7 @@ model AirlineAirport {
 
   @@id([airlineId, airportId])
   @@map("airline_airports")
+  @@schema("catalog")
 }
 
 model Flight {
@@ -239,6 +262,7 @@ model Flight {
 
   @@index([departureDate, originAirportIata, destinationAirportIata])
   @@map("flights")
+  @@schema("catalog")
 }
 
 model Segment {
@@ -261,6 +285,7 @@ model Segment {
   boardingPasses     BoardingPass[]
 
   @@map("segments")
+  @@schema("catalog")
 }
 
 // ============================================================
@@ -277,6 +302,7 @@ model ServiceCatalog {
   airlineConfigs AirlineServiceConfig[]
 
   @@map("service_catalog")
+  @@schema("catalog")
 }
 
 model AirlineServiceConfig {
@@ -294,6 +320,7 @@ model AirlineServiceConfig {
   passengerServices PassengerService[]
 
   @@map("airline_service_configs")
+  @@schema("catalog")
 }
 
 // ============================================================
@@ -317,6 +344,7 @@ model Reservation {
   passengers ReservationPassenger[]
 
   @@map("reservations")
+  @@schema("booking")
 }
 
 model FlightClass {
@@ -331,6 +359,7 @@ model FlightClass {
 
   @@unique([flightId, cabinClass])
   @@map("flight_classes")
+  @@schema("catalog")
 }
 
 model ReservationPassenger {
@@ -347,7 +376,9 @@ model ReservationPassenger {
   extraServices  PassengerService[]
   boardingPasses BoardingPass[]
 
+  @@unique([flightClassId, seatNumber], map: "reservation_passengers_flight_class_seat_unique")
   @@map("reservation_passengers")
+  @@schema("booking")
 }
 
 model PassengerService {
@@ -361,6 +392,7 @@ model PassengerService {
   serviceConfig AirlineServiceConfig @relation(fields: [serviceConfigId], references: [id])
 
   @@map("passenger_services")
+  @@schema("booking")
 }
 
 // ============================================================
@@ -379,6 +411,7 @@ model Promotion {
   reservations Reservation[]
 
   @@map("promotions")
+  @@schema("booking")
 }
 
 model Payment {
@@ -394,6 +427,7 @@ model Payment {
   invoice     Invoice?
 
   @@map("payments")
+  @@schema("payments")
 }
 
 // ============================================================
@@ -405,6 +439,8 @@ enum CheckInStatus {
   CHECKED_IN
   BOARDED
   NO_SHOW
+
+  @@schema("public")
 }
 
 model BoardingPass {
@@ -422,6 +458,7 @@ model BoardingPass {
   segment   Segment              @relation(fields: [segmentId], references: [id])
 
   @@map("boarding_passes")
+  @@schema("checkin")
 }
 
 // ============================================================
@@ -443,4 +480,5 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+  @@schema("audit")
 }

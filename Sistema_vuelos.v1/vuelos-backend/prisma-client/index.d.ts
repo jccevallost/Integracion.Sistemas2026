@@ -130,7 +130,8 @@ export type AuditLog = $Result.DefaultSelection<Prisma.$AuditLogPayload>
 export namespace $Enums {
   export const UserRole: {
   CUSTOMER: 'CUSTOMER',
-  ADMIN: 'ADMIN'
+  ADMIN: 'ADMIN',
+  SERVICE: 'SERVICE'
 };
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole]
@@ -27249,6 +27250,7 @@ export namespace Prisma {
 
   export type ReservationPassengerWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    flightClassId_seatNumber?: ReservationPassengerFlightClassIdSeatNumberCompoundUniqueInput
     AND?: ReservationPassengerWhereInput | ReservationPassengerWhereInput[]
     OR?: ReservationPassengerWhereInput[]
     NOT?: ReservationPassengerWhereInput | ReservationPassengerWhereInput[]
@@ -27262,7 +27264,7 @@ export namespace Prisma {
     flightClass?: XOR<FlightClassRelationFilter, FlightClassWhereInput>
     extraServices?: PassengerServiceListRelationFilter
     boardingPasses?: BoardingPassListRelationFilter
-  }, "id">
+  }, "id" | "flightClassId_seatNumber">
 
   export type ReservationPassengerOrderByWithAggregationInput = {
     id?: SortOrder
@@ -30288,6 +30290,11 @@ export namespace Prisma {
   export type FlightClassRelationFilter = {
     is?: FlightClassWhereInput
     isNot?: FlightClassWhereInput
+  }
+
+  export type ReservationPassengerFlightClassIdSeatNumberCompoundUniqueInput = {
+    flightClassId: string
+    seatNumber: string
   }
 
   export type ReservationPassengerCountOrderByAggregateInput = {

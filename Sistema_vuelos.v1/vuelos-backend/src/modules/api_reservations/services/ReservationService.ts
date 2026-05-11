@@ -7,7 +7,7 @@ import { IPromotionRepository } from '../../api_promotions/interfaces/IPromotion
 import { Promotion } from '../../api_promotions/entities/Promotion.js';
 import {
   NotFoundException, ValidationException,
-  ForbiddenException, NoAvailabilityException,
+  ForbiddenException, NoAvailabilityException, ConflictException,
 } from '../../../shared/exceptions/BusinessException.js';
 
 export class ReservationService implements IReservationService {
@@ -24,6 +24,12 @@ export class ReservationService implements IReservationService {
   async create(userId: string, dto: CreateReservationDto) {
     if (!dto.flightClassId || !dto.passengers?.length) {
       throw new ValidationException('flightClassId y al menos un pasajero son requeridos');
+    }
+    const requestedSeats = dto.passengers
+      .map((passenger) => passenger.seatNumber?.trim().toUpperCase())
+      .filter(Boolean) as string[];
+    if (new Set(requestedSeats).size !== requestedSeats.length) {
+      throw new ConflictException('Hay asientos repetidos en la misma solicitud');
     }
 
     const flightClass = await this.flightClassRepository.findById(dto.flightClassId);
@@ -52,18 +58,31 @@ export class ReservationService implements IReservationService {
       promotionId = promo.id;
     }
 
-    return this.reservationRepository.create({
-      userId,
-      flightId: (flightClass as any).flightId,
-      promotionId,
-      reservationCode: this.generateCode(),
-      totalAmount,
-      status: 'CONFIRMED',
-      flightClassId: dto.flightClassId,
-      passengers: dto.passengers,
-      passengerCount: dto.passengers.length,
-      promotionId_forUsageIncrement: promotionId,
-    });
+    try {
+      return await this.reservationRepository.create({
+        userId,
+        flightId: (flightClass as any).flightId,
+        promotionId,
+        reservationCode: this.generateCode(),
+        totalAmount,
+        status: 'CONFIRMED',
+        flightClassId: dto.flightClassId,
+        passengers: dto.passengers.map((passenger) => ({
+          ...passenger,
+          seatNumber: passenger.seatNumber?.trim().toUpperCase() || undefined,
+        })),
+        passengerCount: dto.passengers.length,
+        promotionId_forUsageIncrement: promotionId,
+      });
+    } catch (err: any) {
+      if (err?.message === 'NO_AVAILABILITY') {
+        throw new NoAvailabilityException('No quedan suficientes asientos disponibles para esta clase');
+      }
+      if (err?.code === 'P2002' || String(err?.message ?? '').includes('reservation_passengers_flight_class_seat_unique')) {
+        throw new ConflictException('Uno de los asientos seleccionados ya está ocupado. Actualiza el mapa y elige otro.');
+      }
+      throw err;
+    }
   }
 
   async getMyReservations(userId: string) {

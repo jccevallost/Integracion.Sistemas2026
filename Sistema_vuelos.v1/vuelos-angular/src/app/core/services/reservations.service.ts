@@ -6,7 +6,7 @@ const BASE = 'https://integracion-sistemas2026.onrender.com/api/v1';
 
 export interface CreateReservationPayload {
   flightClassId: string;
-  passengers: { firstName: string; lastName: string; documentNumber: string }[];
+  passengers: { firstName: string; lastName: string; documentNumber: string; seatNumber?: string }[];
   promotionCode?: string;
 }
 
@@ -35,6 +35,10 @@ export class ReservationsService {
       `${BASE}/reservations/${reservationId}/passengers/${passengerId}/seat`,
       { seatNumber },
     );
+  }
+
+  occupiedSeats(flightClassId: string) {
+    return this.http.get<ApiSuccess<string[]>>(`${BASE}/reservations/flight-classes/${flightClassId}/occupied-seats`);
   }
 
   listAll() {

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message ValidatePromotionRequest {
+  string code   = 1;
+  double amount = 2;
+}
+
+message ValidatePromotionResponse {
+  bool   success        = 1;
+  bool   valid          = 2;
+  string code           = 3;
+  string discount_type  = 4;
+  double discount_value = 5;
+  double discount_amount = 6;
+  double final_amount   = 7;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service PromotionService {
+  rpc ValidatePromotion (ValidatePromotionRequest) returns (ValidatePromotionResponse);
+}

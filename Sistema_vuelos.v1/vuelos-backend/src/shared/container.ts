@@ -179,6 +179,17 @@ const passengerServiceService     = new PassengerServiceService(passengerService
 const reservationPassengerService = new ReservationPassengerService(reservationPassengerRepo);
 const auditLogService             = new AuditLogService(auditLogRepo);
 
+// Services (exported for gRPC layer)
+export {
+  flightService,
+  flightClassService,
+  reservationService,
+  reservationPassengerService,
+  paymentService,
+  promotionService,
+  boardingPassService,
+};
+
 // Controllers
 export const authController                 = new AuthController(authService);
 export const flightController               = new FlightController(flightService);

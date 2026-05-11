@@ -221,6 +221,8 @@ interface PassengerState {
                                   <span *ngIf="isExitRow(row)" class="absolute -left-7 top-1/2 -translate-y-1/2 rounded bg-orange-50 px-1 text-[9px] font-bold text-orange-600 sm:hidden">EXIT</span>
                                   <button *ngFor="let letter of leftSeatLetters" type="button"
                                     (click)="selectSeat(i, row + letter)"
+                                    [disabled]="isSeatOccupiedForPassenger(ps, row + letter)"
+                                    [title]="isSeatOccupiedForPassenger(ps, row + letter) ? 'Asiento ocupado' : seatLabel(row + letter)"
                                     [class]="seatButtonClass(ps, row + letter)">
                                     <span class="block h-1 w-5 rounded-full bg-current opacity-30 mb-0.5"></span>
                                     <span>{{ row }}{{ letter }}</span>
@@ -232,6 +234,8 @@ interface PassengerState {
                                 <div class="relative grid grid-cols-3 gap-1">
                                   <button *ngFor="let letter of rightSeatLetters" type="button"
                                     (click)="selectSeat(i, row + letter)"
+                                    [disabled]="isSeatOccupiedForPassenger(ps, row + letter)"
+                                    [title]="isSeatOccupiedForPassenger(ps, row + letter) ? 'Asiento ocupado' : seatLabel(row + letter)"
                                     [class]="seatButtonClass(ps, row + letter)">
                                     <span class="block h-1 w-5 rounded-full bg-current opacity-30 mb-0.5"></span>
                                     <span>{{ row }}{{ letter }}</span>
@@ -242,10 +246,11 @@ interface PassengerState {
                               </ng-container>
                             </div>
 
-                            <div class="mt-3 grid grid-cols-3 gap-2 text-[10px] font-semibold text-gray-500">
+                            <div class="mt-3 grid grid-cols-4 gap-2 text-[10px] font-semibold text-gray-500">
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-white border border-gray-300"></i>Libre</span>
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-amber-100 border border-amber-300"></i>Premium</span>
                               <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-blue-600"></i>Elegido</span>
+                              <span class="flex items-center justify-center gap-1"><i class="h-2.5 w-2.5 rounded bg-red-100 border border-red-300"></i>Ocupado</span>
                             </div>
                             <div class="mt-3 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 text-center">
                               <span class="rounded-lg border border-gray-200 bg-gray-50 py-1 text-[10px] font-bold text-gray-500">WC</span>
@@ -275,7 +280,7 @@ interface PassengerState {
                         </button>
                       </div>
                     </div>
-                    <button *ngIf="!ps.checkingIn" (click)="updatePS(i, {checkingIn: true})"
+                    <button *ngIf="!ps.checkingIn" (click)="startCheckIn(i)"
                       class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                       Hacer check-in
                     </button>
@@ -554,6 +559,8 @@ export class ReservationDetailComponent implements OnInit {
   cancelling      = signal(false);
   reservation     = signal<Reservation | null>(null);
   passengerStates = signal<PassengerState[]>([]);
+  occupiedSeats   = signal<Set<string>>(new Set());
+  occupiedSeatsLoading = signal(false);
   serviceConfigs  = signal<AirlineServiceConfig[]>([]);
   serviceConfigsLoading = signal(false);
   serviceConfigsError   = signal('');
@@ -595,6 +602,7 @@ export class ReservationDetailComponent implements OnInit {
           checkingIn: false, addingService: false, selectedConfig: '', seatInput: '',
           loadingBP: false, loadingServices: false,
         })));
+        this.loadOccupiedSeats(res.data);
         this.loadServiceConfigs(res.data);
         this.paymentSvc.byReservation(id).subscribe({
           next: pr => {
@@ -646,6 +654,44 @@ export class ReservationDetailComponent implements OnInit {
       const destMatches = !config.destAirportId || !destAirportId || config.destAirportId === destAirportId;
       return originMatches && destMatches;
     });
+  }
+
+  private flightClassIdForReservation(reservation: Reservation | null = this.reservation()) {
+    const passengerWithClass = reservation?.passengers?.find(p => p.flightClassId);
+    return passengerWithClass?.flightClassId ?? reservation?.flight?.flightClasses?.[0]?.id ?? '';
+  }
+
+  private loadOccupiedSeats(reservation: Reservation | null = this.reservation()) {
+    const flightClassId = this.flightClassIdForReservation(reservation);
+    if (!flightClassId) return;
+
+    this.occupiedSeatsLoading.set(true);
+    this.resSvc.occupiedSeats(flightClassId).subscribe({
+      next: res => {
+        this.occupiedSeats.set(new Set(res.data.map(seat => seat.toUpperCase())));
+        this.occupiedSeatsLoading.set(false);
+      },
+      error: () => {
+        this.occupiedSeats.set(new Set());
+        this.occupiedSeatsLoading.set(false);
+      },
+    });
+  }
+
+  startCheckIn(i: number) {
+    this.loadOccupiedSeats();
+    this.updatePS(i, { checkingIn: true });
+  }
+
+  private addOccupiedSeat(seat: string) {
+    const next = new Set(this.occupiedSeats());
+    next.add(seat.toUpperCase());
+    this.occupiedSeats.set(next);
+  }
+
+  isSeatOccupiedForPassenger(ps: PassengerState, seat: string) {
+    const normalized = seat.toUpperCase();
+    return this.occupiedSeats().has(normalized) && ps.passenger.seatNumber !== normalized;
   }
 
   canEdit() {
@@ -707,26 +753,40 @@ export class ReservationDetailComponent implements OnInit {
     const passId    = ps.passenger.id;
     const resId     = this.reservation()?.id;
     const segmentId = this.reservation()?.flight?.segments?.[0]?.id;
-    if (!passId || !segmentId) { alert('No se encontró información del segmento.'); return; }
-    this.bpSvc.create({ passengerId: passId, segmentId, boardingCode: generateBoardingCode(passId), status: 'CHECKED_IN' }).subscribe({
-      next: r => {
-        const seatToSet = ps.seatInput?.trim().toUpperCase() || this.autoSeatForIndex(i);
-        const s2 = [...this.passengerStates()];
-        s2[i] = { ...s2[i], boardingPasses: [r.data], checkingIn: false, seatInput: '' };
-        this.passengerStates.set(s2);
-        if (seatToSet && resId) {
-          this.resSvc.setSeat(resId, passId, seatToSet).subscribe({
-            next: () => {
-              const s3 = [...this.passengerStates()];
-              s3[i] = { ...s3[i], passenger: { ...s3[i].passenger, seatNumber: seatToSet } as any };
-              this.passengerStates.set(s3);
-              if (this.seatPrice(seatToSet) > 0) this.checkoutOpen.set(true);
-            },
-            error: err => alert(err?.error?.error?.message ?? 'Check-in OK, pero no se pudo asignar el asiento'),
-          });
-        }
+    if (!passId || !segmentId || !resId) { alert('No se encontro informacion del segmento o reserva.'); return; }
+    const seatToSet = ps.seatInput?.trim().toUpperCase() || this.autoSeatForIndex(i);
+    if (this.isSeatOccupiedForPassenger(ps, seatToSet)) {
+      this.loadOccupiedSeats();
+      alert(`El asiento ${seatToSet} ya esta ocupado. Elige otro.`);
+      return;
+    }
+
+    this.resSvc.setSeat(resId, passId, seatToSet).subscribe({
+      next: () => {
+        this.bpSvc.create({ passengerId: passId, segmentId, boardingCode: generateBoardingCode(passId), status: 'CHECKED_IN' }).subscribe({
+          next: r => {
+            const s2 = [...this.passengerStates()];
+            s2[i] = {
+              ...s2[i],
+              boardingPasses: [r.data],
+              checkingIn: false,
+              seatInput: '',
+              passenger: { ...s2[i].passenger, seatNumber: seatToSet } as any,
+            };
+            this.passengerStates.set(s2);
+            this.addOccupiedSeat(seatToSet);
+            if (this.seatPrice(seatToSet) > 0) this.checkoutOpen.set(true);
+          },
+          error: err => {
+            this.updatePS(i, { checkingIn: false });
+            alert(err?.error?.error?.message ?? 'Asiento asignado, pero no se pudo crear el boarding pass');
+          },
+        });
       },
-      error: err => alert(err?.error?.error?.message ?? 'Error al hacer check-in'),
+      error: err => {
+        this.loadOccupiedSeats();
+        alert(err?.error?.error?.message ?? 'No se pudo asignar el asiento');
+      },
     });
   }
 
@@ -808,6 +868,7 @@ export class ReservationDetailComponent implements OnInit {
     const selected = ps.seatInput === seat;
     const price = this.seatPrice(seat);
     const base = 'h-10 rounded-lg text-[10px] font-bold transition-colors border flex flex-col items-center justify-center leading-none';
+    if (this.isSeatOccupiedForPassenger(ps, seat)) return `${base} bg-red-100 text-red-700 border-red-300 cursor-not-allowed opacity-90`;
     if (selected) return `${base} bg-blue-600 text-white border-blue-600 shadow-sm`;
     if (price > 0) return `${base} bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100`;
     return `${base} bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-200`;
@@ -824,6 +885,8 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   selectSeat(i: number, seat: string) {
+    const ps = this.passengerStates()[i];
+    if (this.isSeatOccupiedForPassenger(ps, seat)) return;
     this.updatePS(i, { seatInput: seat });
     this.extrasPaymentRef.set('');
     if (this.seatPrice(seat) > 0) this.checkoutOpen.set(true);
@@ -837,9 +900,15 @@ export class ReservationDetailComponent implements OnInit {
   }
 
   private autoSeatForIndex(i: number) {
-    const used = new Set(this.passengerStates().map(ps => ps.passenger.seatNumber).filter(Boolean) as string[]);
+    const used = new Set(this.occupiedSeats());
+    this.passengerStates().forEach((ps, idx) => {
+      if (idx === i) return;
+      if (ps.passenger.seatNumber) used.add(ps.passenger.seatNumber.toUpperCase());
+      if (ps.seatInput) used.add(ps.seatInput.toUpperCase());
+    });
     const freeStandard = SEAT_OPTIONS.find(seat => !used.has(seat) && this.seatPrice(seat) === 0);
-    return freeStandard ?? SEAT_OPTIONS[i % SEAT_OPTIONS.length];
+    const freeAny = SEAT_OPTIONS.find(seat => !used.has(seat));
+    return freeStandard ?? freeAny ?? SEAT_OPTIONS[i % SEAT_OPTIONS.length];
   }
 
   serviceExtrasTotal() {

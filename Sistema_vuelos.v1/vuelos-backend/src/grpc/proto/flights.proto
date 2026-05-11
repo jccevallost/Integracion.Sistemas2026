@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message FlightClassInfo {
+  string id            = 1;
+  string flight_id     = 2;
+  string cabin_class   = 3;
+  int32  available_seats = 4;
+  double base_price    = 5;
+}
+
+message FlightSegmentInfo {
+  string id              = 1;
+  string origin_iata     = 2;
+  string destination_iata = 3;
+  string departure       = 4;
+  string arrival         = 5;
+  int32  duration        = 6;
+  string airline_iata    = 7;
+}
+
+message Flight {
+  string id               = 1;
+  string origin_iata      = 2;
+  string destination_iata = 3;
+  string departure_date   = 4;
+  string status           = 5;
+  int32  duration         = 6;
+  int32  stops            = 7;
+  double lowest_price     = 8;
+  repeated FlightSegmentInfo segments = 9;
+  repeated FlightClassInfo   classes  = 10;
+}
+
+message SearchFlightsRequest {
+  string origin      = 1;
+  string destination = 2;
+  string date        = 3;
+  int32  passengers  = 4;
+  string cabin_class = 5;
+}
+
+message SearchFlightsResponse {
+  bool           success = 1;
+  repeated Flight flights = 2;
+}
+
+message GetFlightRequest {
+  string id = 1;
+}
+
+message GetFlightResponse {
+  bool   success = 1;
+  Flight flight  = 2;
+}
+
+message GetFlightAvailabilityResponse {
+  bool success = 1;
+  repeated FlightClassInfo classes = 2;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service FlightService {
+  rpc SearchFlights          (SearchFlightsRequest) returns (SearchFlightsResponse);
+  rpc GetFlight              (GetFlightRequest)     returns (GetFlightResponse);
+  rpc GetFlightAvailability  (GetFlightRequest)     returns (GetFlightAvailabilityResponse);
+}

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message Passenger {
+  string id               = 1;
+  string reservation_id   = 2;
+  string first_name       = 3;
+  string last_name        = 4;
+  string document_number  = 5;
+  string seat_number      = 6;
+  string cabin_class      = 7;
+}
+
+message GetPassengersRequest {
+  string reservation_id = 1;
+}
+
+message GetPassengersResponse {
+  bool success = 1;
+  repeated Passenger passengers = 2;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service PassengerService {
+  rpc GetPassengersByReservation (GetPassengersRequest) returns (GetPassengersResponse);
+}

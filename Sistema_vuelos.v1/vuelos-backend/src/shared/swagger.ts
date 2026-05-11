@@ -7,7 +7,7 @@ const options: swaggerJsdoc.Options = {
     info: {
       title:       'Vuelos API',
       version:     '1.1.0',
-      description: 'API REST publica de VuelosApp. REST/JSON es el contrato estable para Angular e integradores; gRPC, GraphQL y eventos quedan como evolucion documentada hasta que exista implementacion productiva.',
+      description: 'API REST publica de VuelosApp. REST/JSON es el contrato para Angular y clientes web. El sistema expone ademas un servidor gRPC (puerto 50051) con contratos .proto para integracion con Booking Central y otros microservicios.',
       contact: {
         name:  'Sistema Vuelos',
         email: 'admin@vuelos.com',
@@ -120,7 +120,7 @@ const options: swaggerJsdoc.Options = {
             email:         { type: 'string', format: 'email' },
             firstName:     { type: 'string' },
             firstLastName: { type: 'string' },
-            role:          { type: 'string', enum: ['CUSTOMER', 'ADMIN'] },
+            role:          { type: 'string', enum: ['CUSTOMER', 'ADMIN', 'SERVICE'] },
             isActive:      { type: 'boolean' },
             city:          { $ref: '#/components/schemas/City' },
           },
@@ -272,6 +272,7 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           properties: {
             id:             { type: 'string', format: 'uuid', description: 'ID del pasajero de reserva (reservationPassengerId)' },
+            flightClassId:  { type: 'string', format: 'uuid' },
             firstName:      { type: 'string', example: 'Juan' },
             lastName:       { type: 'string', example: 'Pérez' },
             documentNumber: { type: 'string', example: 'A1234567' },
@@ -293,6 +294,7 @@ const options: swaggerJsdoc.Options = {
                   firstName:      { type: 'string', example: 'Juan' },
                   lastName:       { type: 'string', example: 'Pérez' },
                   documentNumber: { type: 'string', example: 'A1234567' },
+                  seatNumber:     { type: 'string', nullable: true, example: '14C' },
                 },
               },
             },

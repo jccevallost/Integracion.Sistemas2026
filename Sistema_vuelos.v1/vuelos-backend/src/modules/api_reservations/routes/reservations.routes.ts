@@ -6,11 +6,34 @@ import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.mid
 import { validate } from '../../../shared/middlewares/validate.middleware.js';
 import { CreateReservationSchema } from '../../../shared/schemas/validation.schemas.js';
 
+function isUniqueSeatConflict(err: any) {
+  return err?.code === 'P2002'
+    || String(err?.message ?? '').includes('reservation_passengers_flight_class_seat_unique');
+}
+
 export function createReservationRouter(controller: ReservationController, db: PrismaClient): Router {
   const router = Router();
   router.post('/',             authenticate, validate(CreateReservationSchema), controller.create);
   router.get('/my',            authenticate, controller.myReservations);
   router.get('/',              authenticate, requireAdmin, controller.listAll);
+  router.get('/flight-classes/:flightClassId/occupied-seats', authenticate, async (req: any, res: any, next: any) => {
+    try {
+      const seats = await db.reservationPassenger.findMany({
+        where: {
+          flightClassId: String(req.params.flightClassId),
+          seatNumber: { not: null },
+          reservation: { status: { not: 'CANCELLED' } },
+        },
+        select: { seatNumber: true },
+        orderBy: { seatNumber: 'asc' },
+      });
+
+      res.json({
+        success: true,
+        data: seats.map((seat) => seat.seatNumber).filter(Boolean),
+      });
+    } catch (err) { next(err); }
+  });
   router.get('/:id',           authenticate, controller.getById);
   router.delete('/:id',        authenticate, controller.cancel);
   // Angular service calls PATCH /cancel — keep in sync with DELETE /:id
@@ -69,7 +92,13 @@ export function createReservationRouter(controller: ReservationController, db: P
         data: { seatNumber: seat },
       });
       res.json({ success: true, data: updated });
-    } catch (err) { next(err); }
+    } catch (err) {
+      if (isUniqueSeatConflict(err)) {
+        res.status(409).json({ success: false, error: { code: 'CONFLICT', message: 'Ese asiento acaba de ocuparse. Actualiza el mapa y elige otro.' } });
+        return;
+      }
+      next(err);
+    }
   });
 
   return router;

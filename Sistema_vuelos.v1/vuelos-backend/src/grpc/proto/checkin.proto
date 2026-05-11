@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message BoardingPass {
+  string id             = 1;
+  string passenger_id   = 2;
+  string segment_id     = 3;
+  string boarding_code  = 4;
+  string gate           = 5;
+  string boarding_group = 6;
+  string check_in_at    = 7;
+  string status         = 8;
+}
+
+message CheckInRequest {
+  string passenger_id = 1;
+  string segment_id   = 2;
+}
+
+message CheckInResponse {
+  bool         success      = 1;
+  BoardingPass boarding_pass = 2;
+}
+
+message GetBoardingPassRequest {
+  string passenger_id = 1;
+}
+
+message GetBoardingPassResponse {
+  bool success = 1;
+  repeated BoardingPass boarding_passes = 2;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service CheckInService {
+  rpc CheckIn                   (CheckInRequest)        returns (CheckInResponse);
+  rpc GetBoardingPassByPassenger (GetBoardingPassRequest) returns (GetBoardingPassResponse);
+}

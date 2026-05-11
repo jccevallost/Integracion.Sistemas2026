@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message PassengerInput {
+  string first_name       = 1;
+  string last_name        = 2;
+  string document_number  = 3;
+  string seat_number      = 4;
+}
+
+message PassengerInfo {
+  string id               = 1;
+  string first_name       = 2;
+  string last_name        = 3;
+  string document_number  = 4;
+  string seat_number      = 5;
+  string cabin_class      = 6;
+}
+
+message Reservation {
+  string id               = 1;
+  string reservation_code = 2;
+  string status           = 3;
+  double total_amount     = 4;
+  string created_at       = 5;
+  string flight_id        = 6;
+  string user_id          = 7;
+  repeated PassengerInfo passengers = 8;
+}
+
+message CreateReservationRequest {
+  string flight_class_id  = 1;
+  repeated PassengerInput passengers   = 2;
+  string promotion_code   = 3;
+  string user_id          = 4;
+}
+
+message CreateReservationResponse {
+  bool        success     = 1;
+  Reservation reservation = 2;
+}
+
+message GetReservationRequest {
+  string id      = 1;
+  string user_id = 2;
+}
+
+message GetReservationResponse {
+  bool        success     = 1;
+  Reservation reservation = 2;
+}
+
+message CancelReservationRequest {
+  string id      = 1;
+  string user_id = 2;
+}
+
+message CancelReservationResponse {
+  bool   success          = 1;
+  string reservation_code = 2;
+}
+
+message ListReservationsRequest {
+  string user_id = 1;
+}
+
+message ListReservationsResponse {
+  bool success = 1;
+  repeated Reservation reservations = 2;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service ReservationService {
+  rpc CreateReservation  (CreateReservationRequest)  returns (CreateReservationResponse);
+  rpc GetReservation     (GetReservationRequest)     returns (GetReservationResponse);
+  rpc CancelReservation  (CancelReservationRequest)  returns (CancelReservationResponse);
+  rpc ListReservations   (ListReservationsRequest)   returns (ListReservationsResponse);
+}

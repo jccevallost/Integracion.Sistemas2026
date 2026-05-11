@@ -365,7 +365,8 @@ exports.Prisma.JsonNullValueFilter = {
 };
 exports.UserRole = exports.$Enums.UserRole = {
   CUSTOMER: 'CUSTOMER',
-  ADMIN: 'ADMIN'
+  ADMIN: 'ADMIN',
+  SERVICE: 'SERVICE'
 };
 
 exports.FlightStatus = exports.$Enums.FlightStatus = {

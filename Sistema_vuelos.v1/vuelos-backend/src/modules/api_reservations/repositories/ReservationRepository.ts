@@ -60,11 +60,16 @@ export class ReservationRepository implements IReservationRepository {
   }
 
   async create(data: any): Promise<Reservation> {
-    // Transacción atómica: crear reserva + decrementar asientos + incrementar uso de promo
+    // Transaccion atomica: reservar cupos + crear reserva + incrementar uso de promo.
     return this.db.$transaction(async (tx) => {
-      // Recheck disponibilidad
-      const fc = await tx.flightClass.findUnique({ where: { id: data.flightClassId } });
-      if (!fc || fc.availableSeats < data.passengerCount) {
+      const seatsReserved = await tx.flightClass.updateMany({
+        where: {
+          id: data.flightClassId,
+          availableSeats: { gte: data.passengerCount },
+        },
+        data: { availableSeats: { decrement: data.passengerCount } },
+      });
+      if (seatsReserved.count !== 1) {
         throw new Error('NO_AVAILABILITY');
       }
 
@@ -89,11 +94,6 @@ export class ReservationRepository implements IReservationRepository {
         include: fullInclude,
       });
 
-      await tx.flightClass.update({
-        where: { id: data.flightClassId },
-        data: { availableSeats: { decrement: data.passengerCount } },
-      });
-
       if (data.promotionId_forUsageIncrement) {
         await tx.promotion.update({
           where: { id: data.promotionId_forUsageIncrement },
@@ -108,6 +108,10 @@ export class ReservationRepository implements IReservationRepository {
   async cancelAndRestoreSeats(id: string, flightClassId: string, passengerCount: number): Promise<void> {
     await this.db.$transaction(async (tx) => {
       await tx.reservation.update({ where: { id }, data: { status: 'CANCELLED' } });
+      await tx.reservationPassenger.updateMany({
+        where: { reservationId: id },
+        data: { seatNumber: null },
+      });
       if (flightClassId && passengerCount > 0) {
         await tx.flightClass.update({
           where: { id: flightClassId },

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package vuelos.v1;
+
+// ── Mensajes ─────────────────────────────────────────────────
+
+message Payment {
+  string id             = 1;
+  string reservation_id = 2;
+  double amount         = 3;
+  string provider       = 4;
+  string transaction_id = 5;
+  string status         = 6;
+  string created_at     = 7;
+}
+
+message ProcessPaymentRequest {
+  string reservation_id = 1;
+  double amount         = 2;
+  string provider       = 3;
+  string user_id        = 4;
+}
+
+message ProcessPaymentResponse {
+  bool    success = 1;
+  Payment payment = 2;
+}
+
+message GetPaymentByReservationRequest {
+  string reservation_id = 1;
+}
+
+message GetPaymentResponse {
+  bool    success = 1;
+  Payment payment = 2;
+}
+
+// ── Servicio ──────────────────────────────────────────────────
+
+service PaymentService {
+  rpc ProcessPayment          (ProcessPaymentRequest)          returns (ProcessPaymentResponse);
+  rpc GetPaymentByReservation (GetPaymentByReservationRequest) returns (GetPaymentResponse);
+}

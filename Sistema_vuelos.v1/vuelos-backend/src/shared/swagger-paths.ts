@@ -1125,6 +1125,7 @@
  *               - firstName: Juan
  *                 lastName: Pérez
  *                 documentNumber: A1234567
+ *                 seatNumber: 14C
  *             promotionCode: VERANO20
  *     responses:
  *       201:
@@ -1215,6 +1216,93 @@
  */
 
 // ════════════════════════════════════════════════════════
+/**
+ * @openapi
+ * /reservations/flight-classes/{flightClassId}/occupied-seats:
+ *   get:
+ *     tags: [Reservations]
+ *     summary: Listar asientos ocupados por clase de vuelo
+ *     description: Devuelve los asientos ya asignados para pintar el mapa de asientos y bloquear seleccion.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: flightClassId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Lista de codigos de asiento ocupados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { type: string, example: "14C" }
+ *       401:
+ *         description: Token requerido
+ *
+ * /reservations/{id}/cancel:
+ *   patch:
+ *     tags: [Reservations]
+ *     summary: Cancelar reserva (compatibilidad Angular)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       200:
+ *         description: Reserva cancelada
+ *       400:
+ *         description: La reserva ya esta cancelada o completada
+ *       403:
+ *         description: Sin permiso para cancelar esta reserva
+ *
+ * /reservations/{id}/passengers/{passengerId}/seat:
+ *   patch:
+ *     tags: [Reservations]
+ *     summary: Asignar asiento a un pasajero
+ *     description: Asigna asiento durante check-in. Retorna 409 si el asiento ya esta ocupado.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: passengerId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [seatNumber]
+ *             properties:
+ *               seatNumber: { type: string, example: "14C" }
+ *     responses:
+ *       200:
+ *         description: Asiento asignado
+ *       400:
+ *         description: seatNumber es requerido
+ *       403:
+ *         description: Sin permiso para modificar esta reserva
+ *       404:
+ *         description: Reserva o pasajero no encontrado
+ *       409:
+ *         description: Asiento ocupado
+ */
+
 //  RESERVATION PASSENGERS
 // ════════════════════════════════════════════════════════
 /**
