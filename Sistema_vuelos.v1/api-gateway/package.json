@@ -1,0 +1,38 @@
+{
+  "name": "api-gateway",
+  "version": "2.0.0",
+  "description": "API Gateway — Sistema Vuelos Microservicios",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node --import=./dist/telemetry/tracer.js dist/server.js"
+  },
+  "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.75.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.217.0",
+    "@opentelemetry/resources": "^2.7.1",
+    "@opentelemetry/sdk-node": "^0.217.0",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
+    "cors": "^2.8.6",
+    "dataloader": "^2.2.3",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.4.1",
+    "graphql": "^16.14.0",
+    "graphql-yoga": "^5.21.0",
+    "helmet": "^8.1.0",
+    "http-proxy-middleware": "^3.0.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.19.15",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}

@@ -1,0 +1,11 @@
+# Entornos — NUNCA subir a git
+.env
+.env.local
+.env.*.local
+
+# Zips de distribución
+*.zip
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

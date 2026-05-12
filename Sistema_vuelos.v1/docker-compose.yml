@@ -1,0 +1,166 @@
+name: sistema-vuelos
+
+# ════════════════════════════════════════════════════════════════
+#  Variables comunes para todos los microservicios del backend
+# ════════════════════════════════════════════════════════════════
+x-backend-env: &backend-env
+  NODE_ENV: ${NODE_ENV:-production}
+  DATABASE_URL: ${DATABASE_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  JWT_ISSUER: ${JWT_ISSUER:-vuelos-api}
+  JWT_AUDIENCE: ${JWT_AUDIENCE:-vuelos-client}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-2h}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+
+x-backend-build: &backend-build
+  context: ./vuelos-backend
+  dockerfile: Dockerfile
+
+services:
+
+  # ── Jaeger — Distributed Tracing UI (puerto 16686) ──────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI → http://localhost:16686
+      - "4318:4318"     # OTLP HTTP receiver
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── API Gateway ─────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CATALOG_SERVICE_URL: http://catalog-service:3002
+      FLIGHTS_SERVICE_URL: http://flights-service:3003
+      BOOKING_SERVICE_URL: http://booking-service:3004
+      PAYMENTS_SERVICE_URL: http://payments-service:3005
+      ADMIN_SERVICE_URL: http://admin-service:3006
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    depends_on:
+      jaeger:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+      flights-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+      payments-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Auth Service (puerto 3001) ───────────────────────────────
+  auth-service:
+    build:
+      <<: *backend-build
+      target: auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      <<: *backend-env
+      AUTH_SERVICE_PORT: 3001
+      OTEL_SERVICE_NAME: auth-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Catalog Service (puerto 3002) ────────────────────────────
+  catalog-service:
+    build:
+      <<: *backend-build
+      target: catalog-service
+    ports:
+      - "3002:3002"
+    environment:
+      <<: *backend-env
+      CATALOG_SERVICE_PORT: 3002
+      OTEL_SERVICE_NAME: catalog-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Flights Service (puerto 3003 REST + 50051 gRPC) ──────────
+  flights-service:
+    build:
+      <<: *backend-build
+      target: flights-service
+    ports:
+      - "3003:3003"
+      - "50051:50051"
+    environment:
+      <<: *backend-env
+      FLIGHTS_SERVICE_PORT: 3003
+      GRPC_PORT: 50051
+      OTEL_SERVICE_NAME: flights-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Booking Service (puerto 3004) ────────────────────────────
+  booking-service:
+    build:
+      <<: *backend-build
+      target: booking-service
+    ports:
+      - "3004:3004"
+    environment:
+      <<: *backend-env
+      BOOKING_SERVICE_PORT: 3004
+      OTEL_SERVICE_NAME: booking-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Payments Service (puerto 3005) ───────────────────────────
+  payments-service:
+    build:
+      <<: *backend-build
+      target: payments-service
+    ports:
+      - "3005:3005"
+    environment:
+      <<: *backend-env
+      PAYMENTS_SERVICE_PORT: 3005
+      OTEL_SERVICE_NAME: payments-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  # ── Admin Service (puerto 3006) ──────────────────────────────
+  admin-service:
+    build:
+      <<: *backend-build
+      target: admin-service
+    ports:
+      - "3006:3006"
+    environment:
+      <<: *backend-env
+      ADMIN_SERVICE_PORT: 3006
+      OTEL_SERVICE_NAME: admin-service
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+networks:
+  vuelos-net:
+    driver: bridge
