@@ -31,6 +31,7 @@ function makeGenericRouter(
   model: any,
   include?: object,
   schemas?: { create?: ZodSchema; update?: ZodSchema },
+  customDelete?: (req: any, res: any, next: any) => Promise<void>,
 ): Router {
   const entityName = String(model);
   const router = Router();
@@ -67,15 +68,19 @@ function makeGenericRouter(
   };
   router.patch('/:id', ...updateMiddlewares, updateHandler);
   router.put('/:id',   ...updateMiddlewares, updateHandler);
-  router.delete('/:id', async (req, res, next) => {
-    try {
-      const id = String(req.params.id);
-      const oldData = await (db as any)[model].findUnique({ where: { id } });
-      await (db as any)[model].delete({ where: { id } });
-      await audit(db, req, 'DELETE', entityName, id, oldData, null);
-      res.json({ success: true, data: { deleted: true } });
-    } catch (err) { next(err); }
-  });
+  if (customDelete) {
+    router.delete('/:id', customDelete);
+  } else {
+    router.delete('/:id', async (req, res, next) => {
+      try {
+        const id = String(req.params.id);
+        const oldData = await (db as any)[model].findUnique({ where: { id } });
+        await (db as any)[model].delete({ where: { id } });
+        await audit(db, req, 'DELETE', entityName, id, oldData, null);
+        res.json({ success: true, data: { deleted: true } });
+      } catch (err) { next(err); }
+    });
+  }
   return router;
 }
 
@@ -175,11 +180,37 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
   }, { create: CreateSegmentSchema, update: UpdateSegmentSchema }));
 
   // ── Reservas y pasajeros ────────────────────────────────────
-  router.use('/reservations', ...auth, makeGenericRouter(db, 'reservation', {
-    passengers: true,
-    flight: true,
-    user: { select: { id: true, email: true, firstName: true, firstLastName: true } },
-  }));
+  router.use('/reservations', ...auth, makeGenericRouter(
+    db, 'reservation',
+    { passengers: true, flight: true, user: { select: { id: true, email: true, firstName: true, firstLastName: true } } },
+    undefined,
+    async (req, res, next) => {
+      const id = String(req.params.id);
+      try {
+        await db.$transaction(async (tx) => {
+          const passengers = await tx.reservationPassenger.findMany({ where: { reservationId: id }, select: { id: true } });
+          const pids = passengers.map((p) => p.id);
+          if (pids.length) {
+            await tx.passengerService.deleteMany({ where: { passengerId: { in: pids } } });
+            await tx.boardingPass.deleteMany({ where: { passengerId: { in: pids } } });
+            await tx.reservationPassenger.deleteMany({ where: { reservationId: id } });
+          }
+          const payment = await tx.payment.findUnique({ where: { reservationId: id }, select: { id: true } });
+          if (payment) {
+            const invoice = await tx.invoice.findUnique({ where: { paymentId: payment.id }, select: { id: true } });
+            if (invoice) {
+              await tx.invoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
+              await tx.invoice.delete({ where: { id: invoice.id } });
+            }
+            await tx.payment.delete({ where: { id: payment.id } });
+          }
+          await tx.reservation.delete({ where: { id } });
+        });
+        await audit(db, req, 'DELETE', 'reservation', id, null, null);
+        res.json({ success: true, data: { deleted: true } });
+      } catch (err) { next(err); }
+    },
+  ));
   router.use('/reservation-passengers', ...auth, makeGenericRouter(db, 'reservationPassenger', {
     reservation: { select: { id: true, reservationCode: true } },
     flightClass: true,

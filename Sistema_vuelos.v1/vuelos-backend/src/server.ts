@@ -33,6 +33,8 @@ import {
   passengerServiceController,
   reservationPassengerController,
   auditLogController,
+  flightClassService,
+  promotionService,
   prisma,
 } from './shared/container.js';
 
@@ -40,7 +42,7 @@ import {
 import { createAuthRouter }                  from './modules/api_users/routes/auth.routes.js';
 import { createFlightRouter }                from './modules/api_flights/routes/flights.routes.js';
 import { createReservationRouter }           from './modules/api_reservations/routes/reservations.routes.js';
-import { createPromotionRouter }             from './modules/api_promotions/routes/promotions.routes.js';
+import { createPromotionRouter, createPromotionInternalRouter } from './modules/api_promotions/routes/promotions.routes.js';
 import { createAdminRouter }                 from './modules/api_admin/routes/admin.routes.js';
 import { createCountryRouter }               from './modules/api_countries/routes/countries.routes.js';
 import { createCityRouter }                  from './modules/api_cities/routes/cities.routes.js';
@@ -49,7 +51,7 @@ import { createAirlineRouter }               from './modules/api_airlines/routes
 import { createAircraftRouter }              from './modules/api_aircrafts/routes/aircraft.routes.js';
 import { createAirlineAirportRouter }        from './modules/api_airline_airports/routes/airline-airports.routes.js';
 import { createAirlineServiceConfigRouter }  from './modules/api_airline_service_configs/routes/airline-service-config.routes.js';
-import { createFlightClassRouter }           from './modules/api_flight_classes/routes/flight-classes.routes.js';
+import { createFlightClassRouter, createFlightClassInternalRouter } from './modules/api_flight_classes/routes/flight-classes.routes.js';
 import { createSegmentRouter }               from './modules/api_segments/routes/segments.routes.js';
 import { createServiceCatalogRouter }        from './modules/api_service_catalog/routes/service-catalog.routes.js';
 import { createBillingProfileRouter }        from './modules/api_billing_profiles/routes/billing-profiles.routes.js';
@@ -270,6 +272,10 @@ app.use('/api/v1/audit-logs',             createAuditLogRouter(auditLogControlle
 
 // Admin panel (todas requieren ADMIN)
 app.use('/api/v1/admin', createAdminRouter(adminController, prisma));
+
+// ── Rutas internas (servicio-a-servicio, requieren x-internal-api-key) ──────
+app.use('/internal/flight-classes', createFlightClassInternalRouter(flightClassService));
+app.use('/internal/promotions',     createPromotionInternalRouter(promotionService));
 
 // ── Alias sin versión (backward compatibility) ───────────────
 app.use('/api/auth',                  createAuthRouter(authController));
