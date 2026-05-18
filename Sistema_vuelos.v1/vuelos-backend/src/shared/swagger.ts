@@ -5,17 +5,80 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.3',
     info: {
-      title:       'Vuelos API',
-      version:     '1.1.0',
-      description: 'API REST publica de VuelosApp. REST/JSON es el contrato para Angular y clientes web. El sistema expone ademas un servidor gRPC (puerto 50051) con contratos .proto para integracion con Booking Central y otros microservicios.',
+      title:       'Vuelos API — Sistema Integración 2026',
+      version:     '2.0.0',
+      description: `## API REST — VuelosApp (Juan Cevallos)
+
+**Base URL producción:** \`https://integracion-sistemas2026.onrender.com/api/v1\`
+
+---
+
+## 🔗 Guía rápida para el equipo de Booking
+
+### 1 — Autenticación
+\`\`\`
+POST /auth/login
+Body: { "email": "user@example.com", "password": "..." }
+→ Guarda el campo data.token (JWT) para todas las rutas autenticadas.
+Header: Authorization: Bearer <token>
+\`\`\`
+
+### 2 — Buscar vuelos disponibles
+\`\`\`
+GET /flights/search?origin=UIO&destination=GYE&date=2026-06-15
+→ Retorna array de vuelos con flightClasses[] embebidas.
+→ Usa flightClasses[n].id como flightClassId en la reserva.
+\`\`\`
+
+### 3 — Validar código de promoción (opcional)
+\`\`\`
+GET /promotions/validate?code=VERANO20
+→ Retorna { isValid, discountType, discountValue, promotionId }
+\`\`\`
+
+### 4 — Crear reserva
+\`\`\`
+POST /reservations
+Authorization: Bearer <token>
+Body: {
+  "flightClassId": "<uuid de FlightClass>",
+  "promotionCode": "VERANO20",   ← opcional
+  "passengers": [
+    {
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "documentNumber": "1712345678",
+      "seatNumber": "14C"         ← opcional
+    }
+  ]
+}
+→ Retorna la reserva con reservationCode, totalAmount y status CONFIRMED.
+→ Los asientos se decrementan atómicamente en flights-service.
+\`\`\`
+
+### 5 — Endpoints internos (servicio-a-servicio)
+Requieren header: \`x-internal-api-key: <INTERNAL_API_KEY>\`
+Base: \`https://integracion-sistemas2026.onrender.com\` (sin /api/v1)
+\`\`\`
+PATCH /internal/flight-classes/{id}/decrement-seats  Body: { "count": N }
+PATCH /internal/flight-classes/{id}/increment-seats  Body: { "count": N }
+GET   /internal/promotions/by-code/{code}
+PATCH /internal/promotions/{id}/increment-usage
+PATCH /internal/promotions/{id}/decrement-usage
+\`\`\`
+
+---
+Sistema de microservicios con saga pattern. gRPC disponible en puerto 50051.`,
       contact: {
-        name:  'Sistema Vuelos',
-        email: 'admin@vuelos.com',
+        name:  'Juan Cevallos — Sistema Vuelos',
+        email: 'juanccevallos12@gmail.com',
       },
     },
     servers: [
-      { url: 'https://integracion-sistemas2026.onrender.com/api/v1', description: 'Produccion (Render)' },
-      { url: 'http://localhost:3000/api/v1', description: 'Desarrollo local' },
+      { url: 'https://integracion-sistemas2026.onrender.com/api/v1', description: 'Producción — API pública (Render)' },
+      { url: 'https://integracion-sistemas2026.onrender.com',         description: 'Producción — Base URL (endpoints /internal/*)' },
+      { url: 'http://localhost:3000/api/v1',                          description: 'Desarrollo local — API pública' },
+      { url: 'http://localhost:3000',                                  description: 'Desarrollo local — Base URL (endpoints /internal/*)' },
     ],
     components: {
       securitySchemes: {
@@ -74,6 +137,79 @@ const options: swaggerJsdoc.Options = {
             page:    { type: 'integer' },
             limit:   { type: 'integer' },
             pages:   { type: 'integer' },
+          },
+        },
+
+        // ── Booking Integration — Internos ─────────────────────
+        InternalDecrementSeatsRequest: {
+          type: 'object', required: ['count'],
+          properties: {
+            count: { type: 'integer', minimum: 1, example: 2, description: 'Número de asientos a decrementar' },
+          },
+        },
+        InternalIncrementSeatsRequest: {
+          type: 'object', required: ['count'],
+          properties: {
+            count: { type: 'integer', minimum: 1, example: 2, description: 'Número de asientos a liberar (compensación)' },
+          },
+        },
+        InternalPromotionResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                id:            { type: 'string', format: 'uuid' },
+                code:          { type: 'string', example: 'VERANO20' },
+                discountType:  { type: 'string', enum: ['PERCENTAGE', 'FIXED_AMOUNT'] },
+                discountValue: { type: 'number', example: 20 },
+                isActive:      { type: 'boolean', example: true },
+                maxUsages:     { type: 'integer', nullable: true, example: 100 },
+                currentUsages: { type: 'integer', example: 5 },
+              },
+            },
+          },
+        },
+        PromotionValidateResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                isValid:       { type: 'boolean', example: true },
+                promotionId:   { type: 'string', format: 'uuid', nullable: true },
+                discountType:  { type: 'string', enum: ['PERCENTAGE', 'FIXED_AMOUNT'], nullable: true },
+                discountValue: { type: 'number', example: 20, nullable: true },
+                message:       { type: 'string', example: 'Promoción válida', nullable: true },
+              },
+            },
+          },
+        },
+        FlightSearchResult: {
+          type: 'object',
+          description: 'Resultado de búsqueda de vuelos con clases embebidas',
+          properties: {
+            id:                     { type: 'string', format: 'uuid' },
+            originAirportIata:      { type: 'string', example: 'UIO' },
+            destinationAirportIata: { type: 'string', example: 'GYE' },
+            departureDate:          { type: 'string', format: 'date-time' },
+            status:                 { type: 'string', enum: ['SCHEDULED','DELAYED','CANCELLED','COMPLETED'] },
+            lowestPrice:            { type: 'number', example: 89.99 },
+            flightClasses: {
+              type: 'array',
+              description: 'Usa flightClasses[n].id como flightClassId al crear la reserva',
+              items: { $ref: '#/components/schemas/FlightClass' },
+            },
+            route: {
+              type: 'object',
+              properties: {
+                estimatedDuration: { type: 'integer', description: 'Minutos', example: 45 },
+                originAirport:     { $ref: '#/components/schemas/Airport' },
+                destinationAirport:{ $ref: '#/components/schemas/Airport' },
+              },
+            },
           },
         },
 
@@ -484,6 +620,14 @@ const options: swaggerJsdoc.Options = {
         },
     },
     tags: [
+      {
+        name: '🔗 BOOKING — Flujo de integración',
+        description: `Endpoints **públicos** que el booking-service debe consumir en orden.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com/api/v1\`\n\n| # | Método | Ruta | Auth | Descripción |\n|---|--------|------|------|-------------|\n| 1 | POST | \`/auth/login\` | Pública | Obtener JWT |\n| 2 | GET | \`/flights/search\` | Pública | Buscar vuelos disponibles |\n| 3 | GET | \`/promotions/validate?code=\` | Pública | Validar código de descuento |\n| 4 | POST | \`/reservations\` | Bearer JWT | Crear reserva (saga atómico) |\n| 5 | GET | \`/reservations/:id\` | Bearer JWT | Consultar reserva |\n| 6 | DELETE | \`/reservations/:id\` | Bearer JWT | Cancelar reserva |`,
+      },
+      {
+        name: '🔐 BOOKING — Endpoints internos',
+        description: `Endpoints **servicio-a-servicio** — requieren header \`x-internal-api-key: <INTERNAL_API_KEY>\`.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com\` (sin /api/v1)\n\n> Pide el valor de \`INTERNAL_API_KEY\` al responsable del flights-service (Juan Cevallos).\n\n| Método | Ruta | Descripción |\n|--------|------|-------------|\n| PATCH | \`/internal/flight-classes/{id}/decrement-seats\` | Reservar asientos (Body: \`{ count: N }\`) |\n| PATCH | \`/internal/flight-classes/{id}/increment-seats\` | Liberar asientos — compensación saga |\n| GET | \`/internal/promotions/by-code/{code}\` | Obtener promoción por código |\n| PATCH | \`/internal/promotions/{id}/increment-usage\` | Marcar uso de promoción |\n| PATCH | \`/internal/promotions/{id}/decrement-usage\` | Revertir uso — compensación saga |`,
+      },
       { name: 'Auth',                    description: 'Autenticación y perfil de usuario' },
       { name: 'Countries',               description: 'Países — api_countries' },
       { name: 'Cities',                  description: 'Ciudades — api_cities' },

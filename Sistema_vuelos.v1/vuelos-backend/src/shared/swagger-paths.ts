@@ -3,6 +3,491 @@
 // Parámetros de request body alineados con los DTOs reales del proyecto.
 
 // ════════════════════════════════════════════════════════
+//  BOOKING — FLUJO DE INTEGRACIÓN (endpoints públicos)
+// ════════════════════════════════════════════════════════
+/**
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "PASO 1 — Login: obtener JWT"
+ *     description: |
+ *       Autentica al usuario y retorna un JWT.
+ *       Guarda `data.token` — lo necesitas en el header `Authorization: Bearer <token>`
+ *       para crear reservas y consultar datos del usuario.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/LoginRequest' }
+ *           example:
+ *             email: "juan@example.com"
+ *             password: "Seguro123!"
+ *     responses:
+ *       200:
+ *         description: JWT generado exitosamente
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/AuthResponse' }
+ *             example:
+ *               success: true
+ *               data:
+ *                 token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 user:
+ *                   id: "cm9abc123"
+ *                   email: "juan@example.com"
+ *                   role: "CUSTOMER"
+ *       401:
+ *         description: Credenciales inválidas
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /flights/search:
+ *   get:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "PASO 2 — Buscar vuelos disponibles"
+ *     description: |
+ *       Retorna vuelos que coinciden con origen, destino y fecha.
+ *       Cada vuelo incluye `flightClasses[]` — usa `flightClasses[n].id`
+ *       como `flightClassId` al crear la reserva.
+ *
+ *       **Campos importantes de la respuesta:**
+ *       - `id` → flightId (referencia)
+ *       - `flightClasses[n].id` → **flightClassId** (el que va en POST /reservations)
+ *       - `flightClasses[n].cabinClass` → ECONOMY | PREMIUM_ECONOMY | BUSINESS | FIRST
+ *       - `flightClasses[n].availableSeats` → asientos disponibles
+ *       - `flightClasses[n].basePrice` → precio base en USD
+ *     parameters:
+ *       - in: query
+ *         name: origin
+ *         required: true
+ *         schema: { type: string, example: UIO }
+ *         description: Código IATA del aeropuerto de origen
+ *       - in: query
+ *         name: destination
+ *         required: true
+ *         schema: { type: string, example: GYE }
+ *         description: Código IATA del aeropuerto de destino
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema: { type: string, format: date, example: "2026-06-15" }
+ *         description: Fecha de salida (YYYY-MM-DD)
+ *       - in: query
+ *         name: passengers
+ *         schema: { type: integer, default: 1, example: 2 }
+ *         description: Número de pasajeros (filtra por availableSeats)
+ *       - in: query
+ *         name: cabinClass
+ *         schema: { type: string, enum: [ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST] }
+ *         description: Filtrar por clase de cabina
+ *     responses:
+ *       200:
+ *         description: Lista de vuelos disponibles con clases embebidas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/FlightSearchResult' }
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer }
+ *       400:
+ *         description: Parámetros faltantes (origin, destination o date)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /promotions/validate:
+ *   get:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "PASO 3 (opcional) — Validar código de promoción"
+ *     description: |
+ *       Verifica si un código de promoción es válido antes de usarlo.
+ *       Si `isValid: true`, pasa el mismo `code` en el campo `promotionCode`
+ *       del body de POST /reservations.
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         required: true
+ *         schema: { type: string, example: VERANO20 }
+ *     responses:
+ *       200:
+ *         description: Resultado de validación
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/PromotionValidateResponse' }
+ *             example:
+ *               success: true
+ *               data:
+ *                 isValid: true
+ *                 promotionId: "cm9abc123"
+ *                 discountType: "PERCENTAGE"
+ *                 discountValue: 20
+ *                 message: "Promoción válida"
+ *
+ * /reservations:
+ *   post:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "PASO 4 — Crear reserva (saga atómico)"
+ *     description: |
+ *       Crea la reserva ejecutando un saga de 5 pasos atómicos:
+ *       1. Valida que `flightClassId` existe y tiene asientos disponibles
+ *       2. Valida la promoción (si se envía `promotionCode`)
+ *       3. Decrementa los asientos en flights-service
+ *       4. Crea la reserva en booking-db
+ *       5. Incrementa el uso de la promoción
+ *
+ *       Si algún paso falla, se ejecuta compensación automática.
+ *
+ *       **Errores específicos:**
+ *       - `NO_AVAILABILITY` (409) → Sin asientos disponibles
+ *       - `PROMOTION_INVALID` (400) → Código de promoción inválido
+ *       - `FLIGHT_CLASS_NOT_FOUND` (404) → flightClassId no existe
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/CreateReservationRequest' }
+ *           examples:
+ *             sin_promo:
+ *               summary: "Reserva sin promoción (2 pasajeros)"
+ *               value:
+ *                 flightClassId: "cm9flightclass123"
+ *                 passengers:
+ *                   - firstName: "Juan"
+ *                     lastName: "Cevallos"
+ *                     documentNumber: "1712345678"
+ *                     seatNumber: "14C"
+ *                   - firstName: "Ana"
+ *                     lastName: "López"
+ *                     documentNumber: "1798765432"
+ *                     seatNumber: "14D"
+ *             con_promo:
+ *               summary: "Reserva con código de promoción"
+ *               value:
+ *                 flightClassId: "cm9flightclass123"
+ *                 promotionCode: "VERANO20"
+ *                 passengers:
+ *                   - firstName: "Juan"
+ *                     lastName: "Cevallos"
+ *                     documentNumber: "1712345678"
+ *     responses:
+ *       201:
+ *         description: Reserva creada. Asientos decrementados atómicamente.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Reservation' }
+ *             example:
+ *               success: true
+ *               data:
+ *                 id: "cm9res456"
+ *                 reservationCode: "RES-AB12CD34"
+ *                 status: "CONFIRMED"
+ *                 totalAmount: 160.00
+ *                 passengers:
+ *                   - id: "cm9pax789"
+ *                     firstName: "Juan"
+ *                     lastName: "Cevallos"
+ *                     flightClassId: "cm9flightclass123"
+ *       400:
+ *         description: Promoción inválida o datos incorrectos
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *             example:
+ *               success: false
+ *               error: { code: PROMOTION_INVALID, message: "Código de promoción inválido o expirado" }
+ *       401:
+ *         description: JWT ausente o expirado
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       404:
+ *         description: flightClassId no encontrado
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       409:
+ *         description: Sin disponibilidad de asientos
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *             example:
+ *               success: false
+ *               error: { code: NO_AVAILABILITY, message: "No hay asientos disponibles para esta clase" }
+ *
+ * /reservations/{id}:
+ *   get:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "PASO 5 — Consultar reserva"
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: ID de la reserva
+ *     responses:
+ *       200:
+ *         description: Detalle completo de la reserva con pasajeros
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Reservation' }
+ *       404:
+ *         description: Reserva no encontrada
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *   delete:
+ *     tags: ["🔗 BOOKING — Flujo de integración"]
+ *     summary: "Cancelar reserva"
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Reserva cancelada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cancelled: { type: boolean, example: true }
+ */
+
+// ════════════════════════════════════════════════════════
+//  BOOKING — ENDPOINTS INTERNOS (x-internal-api-key)
+// ════════════════════════════════════════════════════════
+/**
+ * @openapi
+ * /internal/flight-classes/{id}/decrement-seats:
+ *   patch:
+ *     tags: ["🔐 BOOKING — Endpoints internos"]
+ *     summary: Decrementar asientos disponibles
+ *     description: |
+ *       Decrementa `count` asientos de forma atómica (UPDATE WHERE availableSeats >= count).
+ *       Retorna **409** si no hay suficientes asientos — el booking-service debe abortar la saga.
+ *
+ *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
+ *     servers:
+ *       - url: https://integracion-sistemas2026.onrender.com
+ *         description: Producción
+ *       - url: http://localhost:3000
+ *         description: Desarrollo local
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: FlightClass.id
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/InternalDecrementSeatsRequest' }
+ *           example: { count: 2 }
+ *     responses:
+ *       200:
+ *         description: Asientos decrementados correctamente
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/SuccessResponse' }
+ *             example: { success: true }
+ *       403:
+ *         description: x-internal-api-key ausente o inválido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       404:
+ *         description: FlightClass no encontrado
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       409:
+ *         description: Sin disponibilidad — asientos insuficientes
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *             example:
+ *               success: false
+ *               error: { code: NO_AVAILABILITY, message: "No hay asientos suficientes" }
+ *
+ * /internal/flight-classes/{id}/increment-seats:
+ *   patch:
+ *     tags: ["🔐 BOOKING — Endpoints internos"]
+ *     summary: Incrementar asientos disponibles (compensación saga)
+ *     description: |
+ *       Revierte un decremento previo. Llamar si la creación de la reserva falla
+ *       después de haber decrementado asientos.
+ *
+ *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
+ *     servers:
+ *       - url: https://integracion-sistemas2026.onrender.com
+ *         description: Producción
+ *       - url: http://localhost:3000
+ *         description: Desarrollo local
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: FlightClass.id
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/InternalIncrementSeatsRequest' }
+ *           example: { count: 2 }
+ *     responses:
+ *       200:
+ *         description: Asientos liberados correctamente
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/SuccessResponse' }
+ *       403:
+ *         description: x-internal-api-key inválido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /internal/promotions/by-code/{code}:
+ *   get:
+ *     tags: ["🔐 BOOKING — Endpoints internos"]
+ *     summary: Obtener promoción por código
+ *     description: |
+ *       Retorna los datos completos de una promoción dado su código.
+ *       Retorna **404** si no existe o está inactiva.
+ *
+ *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
+ *     servers:
+ *       - url: https://integracion-sistemas2026.onrender.com
+ *         description: Producción
+ *       - url: http://localhost:3000
+ *         description: Desarrollo local
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema: { type: string, example: VERANO20 }
+ *         description: Código de la promoción
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Datos de la promoción
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/InternalPromotionResponse' }
+ *       403:
+ *         description: x-internal-api-key inválido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       404:
+ *         description: Promoción no encontrada
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /internal/promotions/{id}/increment-usage:
+ *   patch:
+ *     tags: ["🔐 BOOKING — Endpoints internos"]
+ *     summary: Incrementar uso de promoción
+ *     description: |
+ *       Suma 1 a `currentUsages`. Llamar después de crear la reserva exitosamente.
+ *
+ *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
+ *     servers:
+ *       - url: https://integracion-sistemas2026.onrender.com
+ *         description: Producción
+ *       - url: http://localhost:3000
+ *         description: Desarrollo local
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Promotion.id
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Uso registrado
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/SuccessResponse' }
+ *       403:
+ *         description: x-internal-api-key inválido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       404:
+ *         description: Promoción no encontrada
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *
+ * /internal/promotions/{id}/decrement-usage:
+ *   patch:
+ *     tags: ["🔐 BOOKING — Endpoints internos"]
+ *     summary: Decrementar uso de promoción (compensación saga)
+ *     description: |
+ *       Resta 1 a `currentUsages`. Llamar si la reserva falla después de
+ *       haber incrementado el uso de la promoción.
+ *
+ *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
+ *     servers:
+ *       - url: https://integracion-sistemas2026.onrender.com
+ *         description: Producción
+ *       - url: http://localhost:3000
+ *         description: Desarrollo local
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Promotion.id
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Uso revertido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/SuccessResponse' }
+ *       403:
+ *         description: x-internal-api-key inválido
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ */
+
+// ════════════════════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════════════════════
 /**
