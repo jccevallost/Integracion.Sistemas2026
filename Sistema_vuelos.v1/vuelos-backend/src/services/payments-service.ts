@@ -4,7 +4,7 @@ import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { registerAuditSubscriber } from '../shared/events/audit-subscriber.js';
 import { paymentsEventPublisher } from '../shared/events/event-publisher.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
-import prisma from '../shared/database/prisma.client.js';
+import prisma from '../shared/database/prisma.payments.client.js';
 
 import { PaymentRepository }         from '../modules/api_payments/repositories/PaymentRepository.js';
 import { InvoiceRepository }         from '../modules/api_invoices/repositories/InvoiceRepository.js';

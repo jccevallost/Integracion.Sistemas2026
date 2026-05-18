@@ -6,4 +6,6 @@ export interface IFlightClassRepository extends IBaseRepository<FlightClass> {
   findByFlightId(flightId: string): Promise<FlightClass[]>;
   decrementSeats(id: string, count: number): Promise<void>;
   incrementSeats(id: string, count: number): Promise<void>;
+  /** Atomic decrement: returns false if availableSeats < count (no update performed). */
+  decrementSeatsAtomic(id: string, count: number): Promise<boolean>;
 }

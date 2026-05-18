@@ -1,0 +1,42 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../prisma-clients/auth"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("AUTH_DATABASE_URL")
+  schemas  = ["public", "identity"]
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  SERVICE
+  @@schema("public")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  firstName      String    @map("first_name")
+  secondName     String?   @map("second_name")
+  firstLastName  String    @map("first_last_name")
+  secondLastName String?   @map("second_last_name")
+  mainAddress    String    @map("main_address")
+  secondaryAddress String? @map("secondary_address")
+  cityId         String    @map("city_id")
+  phone          String?
+  birthDate      DateTime? @map("birth_date")
+  role           UserRole  @default(CUSTOMER)
+  isActive       Boolean   @default(true)  @map("is_active")
+  tokenVersion   Int       @default(0)     @map("token_version")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt      @map("updated_at")
+
+  @@map("users")
+  @@schema("identity")
+}

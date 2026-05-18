@@ -4,13 +4,15 @@ import { IReservationRepository } from '../interfaces/IReservationRepository.js'
 import { Reservation } from '../entities/Reservation.js';
 import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';
 
+// TODO(Phase-4): Once DBs are split, replace these cross-service includes with
+// HTTP calls to flights-service and auth-service instead of Prisma JOINs.
 const fullInclude = {
   passengers: true,
   flight: {
     include: {
       segments: {
         include: {
-          originAirport: { include: { city: { include: { country: true } } } },
+          originAirport:      { include: { city: { include: { country: true } } } },
           destinationAirport: { include: { city: { include: { country: true } } } },
           airline: true,
         },
@@ -41,7 +43,7 @@ export class ReservationRepository implements IReservationRepository {
 
   async findByUserId(userId: string): Promise<any[]> {
     return this.db.reservation.findMany({
-      where: { userId },
+      where:   { userId },
       include: fullInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -59,65 +61,46 @@ export class ReservationRepository implements IReservationRepository {
     await this.db.reservation.update({ where: { id }, data: { status: status as any } });
   }
 
+  /**
+   * Creates a reservation in the booking DB only.
+   * Seat decrement and promotion-usage increment are handled by ReservationService
+   * via HTTP calls to flights-service (saga pattern) — NOT here.
+   */
   async create(data: any): Promise<Reservation> {
-    // Transaccion atomica: reservar cupos + crear reserva + incrementar uso de promo.
-    return this.db.$transaction(async (tx) => {
-      const seatsReserved = await tx.flightClass.updateMany({
-        where: {
-          id: data.flightClassId,
-          availableSeats: { gte: data.passengerCount },
+    return this.db.reservation.create({
+      data: {
+        reservationCode: data.reservationCode,
+        userId:          data.userId,
+        flightId:        data.flightId,
+        promotionId:     data.promotionId,
+        totalAmount:     data.totalAmount,
+        status:          data.status,
+        passengers: {
+          create: data.passengers.map((p: any) => ({
+            flightClassId:  data.flightClassId,
+            firstName:      p.firstName,
+            lastName:       p.lastName,
+            documentNumber: p.documentNumber,
+            seatNumber:     p.seatNumber ?? null,
+          })),
         },
-        data: { availableSeats: { decrement: data.passengerCount } },
-      });
-      if (seatsReserved.count !== 1) {
-        throw new Error('NO_AVAILABILITY');
-      }
-
-      const reservation = await tx.reservation.create({
-        data: {
-          reservationCode: data.reservationCode,
-          userId: data.userId,
-          flightId: data.flightId,
-          promotionId: data.promotionId,
-          totalAmount: data.totalAmount,
-          status: data.status,
-          passengers: {
-            create: data.passengers.map((p: any) => ({
-              flightClassId: data.flightClassId,
-              firstName: p.firstName,
-              lastName: p.lastName,
-              documentNumber: p.documentNumber,
-              seatNumber: p.seatNumber ?? null,
-            })),
-          },
-        },
-        include: fullInclude,
-      });
-
-      if (data.promotionId_forUsageIncrement) {
-        await tx.promotion.update({
-          where: { id: data.promotionId_forUsageIncrement },
-          data: { currentUsages: { increment: 1 } },
-        });
-      }
-
-      return reservation;
+      },
+      include: fullInclude,
     }) as any;
   }
 
-  async cancelAndRestoreSeats(id: string, flightClassId: string, passengerCount: number): Promise<void> {
+  /**
+   * Cancels the reservation and clears passenger seat numbers in the booking DB.
+   * Seat restoration and promotion-usage decrement are handled by ReservationService
+   * via HTTP calls to flights-service (saga pattern) — NOT here.
+   */
+  async cancelAndRestoreSeats(id: string): Promise<void> {
     await this.db.$transaction(async (tx) => {
       await tx.reservation.update({ where: { id }, data: { status: 'CANCELLED' } });
       await tx.reservationPassenger.updateMany({
         where: { reservationId: id },
-        data: { seatNumber: null },
+        data:  { seatNumber: null },
       });
-      if (flightClassId && passengerCount > 0) {
-        await tx.flightClass.update({
-          where: { id: flightClassId },
-          data: { availableSeats: { increment: passengerCount } },
-        });
-      }
     });
   }
 

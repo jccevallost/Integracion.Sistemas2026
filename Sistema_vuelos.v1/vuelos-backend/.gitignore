@@ -7,8 +7,9 @@ dist/
 # Variables de entorno — NUNCA subir esto a git
 .env
 
-# Prisma
+# Prisma — clientes generados por servicio (se regeneran en el build)
 prisma/migrations/dev.db
+prisma-clients/
 
 # Logs
 *.log

@@ -1,0 +1,94 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../prisma-clients/flights"
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("FLIGHTS_DATABASE_URL")
+  schemas  = ["public", "catalog", "booking"]
+}
+
+enum FlightStatus {
+  SCHEDULED
+  DELAYED
+  CANCELLED
+  COMPLETED
+  @@schema("public")
+}
+
+enum CabinClass {
+  ECONOMY
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST
+  @@schema("public")
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  @@schema("public")
+}
+
+model Flight {
+  id                     String       @id @default(cuid())
+  originAirportIata      String       @map("origin_airport_iata")
+  destinationAirportIata String       @map("destination_airport_iata")
+  departureDate          DateTime     @map("departure_date")
+  status                 FlightStatus @default(SCHEDULED)
+
+  segments      Segment[]
+  flightClasses FlightClass[]
+
+  @@index([departureDate, originAirportIata, destinationAirportIata])
+  @@map("flights")
+  @@schema("catalog")
+}
+
+model Segment {
+  id                   String   @id @default(cuid())
+  segmentNumber        String   @map("segment_number")
+  originAirportId      String   @map("origin_airport_id")
+  destinationAirportId String   @map("destination_airport_id")
+  departureDateTime    DateTime @map("departure_datetime")
+  arrivalDateTime      DateTime @map("arrival_datetime")
+  airlineId            String   @map("airline_id")
+  aircraftId           String?  @map("aircraft_id")
+  estimatedDuration    Int      @map("estimated_duration")
+  flightId             String?  @map("flight_id")
+
+  flight Flight? @relation(fields: [flightId], references: [id])
+
+  @@map("segments")
+  @@schema("catalog")
+}
+
+model FlightClass {
+  id             String     @id @default(cuid())
+  flightId       String     @map("flight_id")
+  cabinClass     CabinClass @map("cabin_class")
+  availableSeats Int        @map("available_seats")
+  basePrice      Decimal    @map("base_price") @db.Decimal(10, 2)
+
+  flight Flight @relation(fields: [flightId], references: [id])
+
+  @@unique([flightId, cabinClass])
+  @@map("flight_classes")
+  @@schema("catalog")
+}
+
+model Promotion {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
+  maxUsages     Int?         @map("max_usages")
+  currentUsages Int          @default(0) @map("current_usages")
+  isActive      Boolean      @default(true) @map("is_active")
+
+  @@map("promotions")
+  @@schema("booking")
+}

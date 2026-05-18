@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { createServiceApp } from '../shared/app-factory.js';
 import { errorHandler } from '../shared/middlewares/error.middleware.js';
+import { requireInternalService } from '../shared/middlewares/internal.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
-import prisma from '../shared/database/prisma.client.js';
+import prisma from '../shared/database/prisma.auth.client.js';
 
 import { UserRepository }    from '../modules/api_users/repositories/UserRepository.js';
 import { AuthService }       from '../modules/api_users/services/AuthService.js';
@@ -25,6 +26,23 @@ app.get(['/health', '/'], (_req, res) => {
 
 app.use('/api/v1/auth', createAuthRouter(authController));
 app.use('/api/auth',    createAuthRouter(authController));
+
+// Endpoint interno — valida liveness del token para otros microservicios
+app.post('/internal/auth/verify-token', requireInternalService, async (req: any, res: any) => {
+  try {
+    const { userId, tokenVersion } = req.body ?? {};
+    if (!userId) { res.status(400).json({ valid: false }); return; }
+    const db = prisma as any;
+    const user = await db.user.findUnique({
+      where:  { id: String(userId) },
+      select: { isActive: true, tokenVersion: true },
+    });
+    const valid = !!(user && user.isActive && user.tokenVersion === (tokenVersion ?? 0));
+    res.json({ valid });
+  } catch {
+    res.status(500).json({ valid: false });
+  }
+});
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Ruta ${req.originalUrl} no encontrada` } });

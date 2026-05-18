@@ -1,16 +1,17 @@
 name: sistema-vuelos
 
 # ════════════════════════════════════════════════════════════════
-#  Variables comunes para todos los microservicios del backend
+#  Variables comunes a todos los microservicios
 # ════════════════════════════════════════════════════════════════
 x-backend-env: &backend-env
   NODE_ENV: ${NODE_ENV:-production}
-  DATABASE_URL: ${DATABASE_URL}
   JWT_SECRET: ${JWT_SECRET}
   JWT_ISSUER: ${JWT_ISSUER:-vuelos-api}
   JWT_AUDIENCE: ${JWT_AUDIENCE:-vuelos-client}
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-2h}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+  AUTH_SERVICE_URL: http://auth-service:3001
 
 x-backend-build: &backend-build
   context: ./vuelos-backend
@@ -80,6 +81,9 @@ services:
       <<: *backend-env
       AUTH_SERVICE_PORT: 3001
       OTEL_SERVICE_NAME: auth-service
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL}
+      DATABASE_URL: ${AUTH_DATABASE_URL}
+      AUTH_DATABASE_ACCESS: "direct"   # usa DB propia, no HTTP
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -95,6 +99,8 @@ services:
       <<: *backend-env
       CATALOG_SERVICE_PORT: 3002
       OTEL_SERVICE_NAME: catalog-service
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL}
+      DATABASE_URL: ${CATALOG_DATABASE_URL}
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -112,6 +118,8 @@ services:
       FLIGHTS_SERVICE_PORT: 3003
       GRPC_PORT: 50051
       OTEL_SERVICE_NAME: flights-service
+      FLIGHTS_DATABASE_URL: ${FLIGHTS_DATABASE_URL}
+      DATABASE_URL: ${FLIGHTS_DATABASE_URL}
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -127,6 +135,9 @@ services:
       <<: *backend-env
       BOOKING_SERVICE_PORT: 3004
       OTEL_SERVICE_NAME: booking-service
+      BOOKING_DATABASE_URL: ${BOOKING_DATABASE_URL}
+      DATABASE_URL: ${BOOKING_DATABASE_URL}
+      FLIGHTS_SERVICE_URL: http://flights-service:3003
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -142,6 +153,8 @@ services:
       <<: *backend-env
       PAYMENTS_SERVICE_PORT: 3005
       OTEL_SERVICE_NAME: payments-service
+      PAYMENTS_DATABASE_URL: ${PAYMENTS_DATABASE_URL}
+      DATABASE_URL: ${PAYMENTS_DATABASE_URL}
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -157,6 +170,11 @@ services:
       <<: *backend-env
       ADMIN_SERVICE_PORT: 3006
       OTEL_SERVICE_NAME: admin-service
+      ADMIN_DATABASE_URL: ${ADMIN_DATABASE_URL}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL}
+      FLIGHTS_DATABASE_URL: ${FLIGHTS_DATABASE_URL}
+      BOOKING_DATABASE_URL: ${BOOKING_DATABASE_URL}
+      DATABASE_URL: ${ADMIN_DATABASE_URL}
     restart: unless-stopped
     networks:
       - vuelos-net

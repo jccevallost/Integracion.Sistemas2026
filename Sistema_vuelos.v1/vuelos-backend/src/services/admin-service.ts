@@ -2,7 +2,11 @@ import 'dotenv/config';
 import { createServiceApp } from '../shared/app-factory.js';
 import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
-import prisma from '../shared/database/prisma.client.js';
+import prismaAdmin  from '../shared/database/prisma.admin.client.js';
+import prismaAuth   from '../shared/database/prisma.auth.client.js';
+import prismaFlights from '../shared/database/prisma.flights.client.js';
+import prismaBooking from '../shared/database/prisma.booking.client.js';
+const prisma = prismaAdmin; // client principal para audit logs
 
 import { UserRepository }    from '../modules/api_users/repositories/UserRepository.js';
 import { AuditLogRepository } from '../modules/api_audit_logs/repositories/AuditLogRepository.js';
@@ -28,16 +32,16 @@ const PORT = Number(process.env.ADMIN_SERVICE_PORT) || 3006;
 
 validateJwtConfig();
 
-// Repositories
-const userRepo     = new UserRepository(prisma);
-const auditLogRepo = new AuditLogRepository(prisma);
+// Repositories — cada uno usa el cliente del dominio correcto
+const userRepo     = new UserRepository(prismaAuth as any);
+const auditLogRepo = new AuditLogRepository(prismaAdmin as any);
 
-// Query repos (multi-dominio para estadísticas del dashboard admin)
-const airportQuery     = new AirportQueryRepository(prisma);
-const flightQuery      = new FlightQueryRepository(prisma);
-const reservationQuery = new ReservationQueryRepository(prisma);
-const userQuery        = new UserQueryRepository(prisma);
-const auditLogQuery    = new AuditLogQueryRepository(prisma);
+// Query repos — cada uno usa el cliente del dominio correcto
+const airportQuery     = new AirportQueryRepository(prismaFlights as any);  // catalog está en flights-db
+const flightQuery      = new FlightQueryRepository(prismaFlights as any);
+const reservationQuery = new ReservationQueryRepository(prismaBooking as any);
+const userQuery        = new UserQueryRepository(prismaAuth as any);
+const auditLogQuery    = new AuditLogQueryRepository(prismaAdmin as any);
 
 // Services
 const userService     = new UserService(userRepo);
@@ -59,9 +63,9 @@ app.get(['/health', '/'], (_req, res) => {
   });
 });
 
-app.use('/api/v1/admin',      createAdminRouter(adminController, prisma));
+app.use('/api/v1/admin',      createAdminRouter(adminController, prismaAuth as any));
 app.use('/api/v1/audit-logs', createAuditLogRouter(auditLogController));
-app.use('/api/admin',         createAdminRouter(adminController, prisma));
+app.use('/api/admin',         createAdminRouter(adminController, prismaAuth as any));
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Ruta ${req.originalUrl} no encontrada` } });
@@ -69,12 +73,23 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 async function start() {
-  await prisma.$connect();
+  await Promise.all([
+    prismaAdmin.$connect(),
+    prismaAuth.$connect(),
+    prismaFlights.$connect(),
+    prismaBooking.$connect(),
+  ]);
   app.listen(PORT, () => console.log(`🚀 [admin-service] → http://localhost:${PORT}`));
 }
 
-process.on('SIGINT',  async () => { await prisma.$disconnect(); process.exit(0); });
-process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGINT',  async () => {
+  await Promise.allSettled([prismaAdmin.$disconnect(), prismaAuth.$disconnect(), prismaFlights.$disconnect(), prismaBooking.$disconnect()]);
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  await Promise.allSettled([prismaAdmin.$disconnect(), prismaAuth.$disconnect(), prismaFlights.$disconnect(), prismaBooking.$disconnect()]);
+  process.exit(0);
+});
 process.on('uncaughtException',  (err) => { console.error('[admin-service] Excepción:', err); process.exit(1); });
 process.on('unhandledRejection', (r)   => { console.error('[admin-service] Promesa rechazada:', r); process.exit(1); });
 

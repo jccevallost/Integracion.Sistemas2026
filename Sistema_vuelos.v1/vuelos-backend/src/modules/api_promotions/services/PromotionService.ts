@@ -49,4 +49,20 @@ export class PromotionService implements IPromotionService {
     if (!existing) throw new NotFoundException('Promoción', id);
     await this.promotionRepository.delete(id);
   }
+
+  async findByCode(code: string): Promise<any | null> {
+    return this.promotionRepository.findByCode(code);
+  }
+
+  async incrementUsage(id: string): Promise<void> {
+    const existing = await this.promotionRepository.findById(id);
+    if (!existing) throw new NotFoundException('Promoción', id);
+    await this.promotionRepository.incrementUsage(id);
+  }
+
+  async decrementUsage(id: string): Promise<void> {
+    const existing = await this.promotionRepository.findById(id);
+    if (!existing) throw new NotFoundException('Promoción', id);
+    await this.promotionRepository.decrementUsage(id);
+  }
 }

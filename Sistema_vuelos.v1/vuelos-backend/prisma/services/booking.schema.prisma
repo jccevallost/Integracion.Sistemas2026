@@ -1,0 +1,91 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../prisma-clients/booking"
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("BOOKING_DATABASE_URL")
+  schemas  = ["public", "booking", "checkin"]
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  @@schema("public")
+}
+
+enum CheckInStatus {
+  NOT_CHECKED_IN
+  CHECKED_IN
+  BOARDED
+  NO_SHOW
+  @@schema("public")
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  userId          String            @map("user_id")
+  flightId        String            @map("flight_id")
+  promotionId     String?           @map("promotion_id")
+  reservationCode String            @unique @map("reservation_code")
+  totalAmount     Decimal           @map("total_amount") @db.Decimal(10, 2)
+  status          ReservationStatus @default(PENDING)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  passengers ReservationPassenger[]
+
+  @@map("reservations")
+  @@schema("booking")
+}
+
+model ReservationPassenger {
+  id             String  @id @default(cuid())
+  reservationId  String  @map("reservation_id")
+  flightClassId  String  @map("flight_class_id")
+  firstName      String  @map("first_name")
+  lastName       String  @map("last_name")
+  documentNumber String  @map("document_number")
+  seatNumber     String? @map("seat_number")
+
+  reservation   Reservation      @relation(fields: [reservationId], references: [id])
+  extraServices PassengerService[]
+  boardingPasses BoardingPass[]
+
+  @@unique([flightClassId, seatNumber], map: "reservation_passengers_flight_class_seat_unique")
+  @@map("reservation_passengers")
+  @@schema("booking")
+}
+
+model PassengerService {
+  id                 String  @id @default(cuid())
+  passengerId        String  @map("passenger_id")
+  serviceConfigId    String  @map("service_config_id")
+  quantity           Int     @default(1)
+  unitPriceAtBooking Decimal @map("unit_price_at_booking") @db.Decimal(10, 2)
+
+  passenger ReservationPassenger @relation(fields: [passengerId], references: [id])
+
+  @@map("passenger_services")
+  @@schema("booking")
+}
+
+model BoardingPass {
+  id          String @id @default(cuid())
+  passengerId String @unique @map("passenger_id")
+  segmentId   String @map("segment_id")
+
+  boardingCode  String        @unique @map("boarding_code")
+  gate          String?
+  boardingGroup String?       @map("boarding_group")
+  checkInAt     DateTime?     @map("check_in_at")
+  status        CheckInStatus @default(NOT_CHECKED_IN)
+
+  passenger ReservationPassenger @relation(fields: [passengerId], references: [id])
+
+  @@map("boarding_passes")
+  @@schema("checkin")
+}

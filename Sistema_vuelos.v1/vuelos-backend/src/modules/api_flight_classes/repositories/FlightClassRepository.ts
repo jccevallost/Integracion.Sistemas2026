@@ -44,6 +44,14 @@ export class FlightClassRepository implements IFlightClassRepository {
     });
   }
 
+  async decrementSeatsAtomic(id: string, count: number): Promise<boolean> {
+    const result = await this.db.flightClass.updateMany({
+      where: { id, availableSeats: { gte: count } },
+      data:  { availableSeats: { decrement: count } },
+    });
+    return result.count === 1;
+  }
+
   async create(data: any): Promise<FlightClass> {
     return this.db.flightClass.create({ data }) as any;
   }

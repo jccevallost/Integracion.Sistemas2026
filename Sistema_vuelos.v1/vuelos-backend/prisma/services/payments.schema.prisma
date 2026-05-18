@@ -1,0 +1,75 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../prisma-clients/payments"
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PAYMENTS_DATABASE_URL")
+  schemas  = ["public", "payments"]
+}
+
+model BillingProfile {
+  id           String  @id @default(cuid())
+  userId       String  @map("user_id")
+  taxId        String  @map("tax_id")
+  businessName String  @map("business_name")
+  email        String?
+  address      String
+  cityId       String  @map("city_id")
+  isDefault    Boolean @default(false) @map("is_default")
+
+  invoices Invoice[]
+
+  @@map("billing_profiles")
+  @@schema("payments")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  reservationId String   @unique @map("reservation_id")
+  amount        Decimal  @db.Decimal(10, 2)
+  provider      String
+  transactionId String   @map("transaction_id")
+  status        String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  invoice Invoice?
+
+  @@map("payments")
+  @@schema("payments")
+}
+
+model Invoice {
+  id               String @id @default(cuid())
+  paymentId        String @unique @map("payment_id")
+  billingProfileId String @map("billing_profile_id")
+  invoiceNumber    String @unique @map("invoice_number")
+  subtotal         Decimal  @db.Decimal(10, 2)
+  taxAmount        Decimal  @map("tax_amount") @db.Decimal(10, 2)
+  total            Decimal  @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  payment        Payment        @relation(fields: [paymentId], references: [id])
+  billingProfile BillingProfile @relation(fields: [billingProfileId], references: [id])
+  items          InvoiceItem[]
+
+  @@map("invoices")
+  @@schema("payments")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String  @map("invoice_id")
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(10, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_items")
+  @@schema("payments")
+}

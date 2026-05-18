@@ -76,6 +76,7 @@ import { InvoiceItemService }           from '../modules/api_invoice_items/servi
 import { PassengerServiceService }      from '../modules/api_passenger_services/services/PassengerServiceService.js';
 import { ReservationPassengerService }  from '../modules/api_reservation_passengers/services/ReservationPassengerService.js';
 import { AuditLogService }              from '../modules/api_audit_logs/services/AuditLogService.js';
+import { LocalFlightsServiceAdapter }    from './http-clients/LocalFlightsServiceAdapter.js';
 
 // ── Controllers ───────────────────────────────────────────────
 import { AuthController }                   from '../modules/api_users/controllers/AuthController.js';
@@ -157,7 +158,8 @@ const auditLogQuery             = new AuditLogQueryRepository(prisma);
 // Services
 const authService                 = new AuthService(userRepo);
 const flightService               = new FlightService(flightRepo);
-const reservationService          = new ReservationService(reservationRepo, flightClassRepo, promotionRepo);
+const localFlightsAdapter         = new LocalFlightsServiceAdapter(flightClassRepo, promotionRepo);
+const reservationService          = new ReservationService(reservationRepo, localFlightsAdapter);
 const promotionService            = new PromotionService(promotionRepo);
 const userService                 = new UserService(userRepo);
 const countryService              = new CountryService(countryRepo);

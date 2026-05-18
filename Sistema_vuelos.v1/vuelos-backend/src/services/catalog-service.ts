@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createServiceApp } from '../shared/app-factory.js';
 import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
-import prisma from '../shared/database/prisma.client.js';
+import prisma from '../shared/database/prisma.catalog.client.js';
 
 import { CountryRepository }              from '../modules/api_countries/repositories/CountryRepository.js';
 import { CityRepository }                 from '../modules/api_cities/repositories/CityRepository.js';

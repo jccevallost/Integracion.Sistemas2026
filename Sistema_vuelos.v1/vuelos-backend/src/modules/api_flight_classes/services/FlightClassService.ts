@@ -1,7 +1,7 @@
 // application/services/FlightClassService.ts
 import { IFlightClassService } from '../interfaces/IFlightClassService.js';
 import { IFlightClassRepository } from '../interfaces/IFlightClassRepository.js';
-import { NotFoundException } from '../../../shared/exceptions/BusinessException.js';
+import { NotFoundException, NoAvailabilityException } from '../../../shared/exceptions/BusinessException.js';
 
 export class FlightClassService implements IFlightClassService {
   constructor(private readonly repo: IFlightClassRepository) {}
@@ -26,5 +26,14 @@ export class FlightClassService implements IFlightClassService {
   async remove(id: string) {
     await this.getById(id);
     await this.repo.delete(id);
+  }
+
+  async decrementSeats(id: string, count: number): Promise<void> {
+    const ok = await this.repo.decrementSeatsAtomic(id, count);
+    if (!ok) throw new NoAvailabilityException(`Solo quedan asientos insuficientes para la clase ${id}`);
+  }
+
+  async incrementSeats(id: string, count: number): Promise<void> {
+    await this.repo.incrementSeats(id, count);
   }
 }

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createServiceApp } from '../shared/app-factory.js';
 import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
-import prisma from '../shared/database/prisma.client.js';
+import prisma from '../shared/database/prisma.flights.client.js';
 import { startGrpcServer } from '../grpc/grpc.server.js';
 
 import { FlightRepository }      from '../modules/api_flights/repositories/FlightRepository.js';
@@ -27,10 +27,10 @@ import { FlightClassController } from '../modules/api_flight_classes/controllers
 import { SegmentController }     from '../modules/api_segments/controllers/SegmentController.js';
 import { PromotionController }   from '../modules/api_promotions/controllers/PromotionController.js';
 
-import { createFlightRouter }      from '../modules/api_flights/routes/flights.routes.js';
-import { createFlightClassRouter } from '../modules/api_flight_classes/routes/flight-classes.routes.js';
-import { createSegmentRouter }     from '../modules/api_segments/routes/segments.routes.js';
-import { createPromotionRouter }   from '../modules/api_promotions/routes/promotions.routes.js';
+import { createFlightRouter }                                        from '../modules/api_flights/routes/flights.routes.js';
+import { createFlightClassRouter, createFlightClassInternalRouter } from '../modules/api_flight_classes/routes/flight-classes.routes.js';
+import { createSegmentRouter }                                       from '../modules/api_segments/routes/segments.routes.js';
+import { createPromotionRouter, createPromotionInternalRouter }     from '../modules/api_promotions/routes/promotions.routes.js';
 
 const PORT      = Number(process.env.FLIGHTS_SERVICE_PORT) || 3003;
 const GRPC_PORT = Number(process.env.GRPC_PORT) || 50051;
@@ -75,12 +75,16 @@ app.get(['/health', '/'], (_req, res) => {
   });
 });
 
-app.use('/api/v1/flights',       createFlightRouter(flightController));
+app.use('/api/v1/flights',        createFlightRouter(flightController));
 app.use('/api/v1/flight-classes', createFlightClassRouter(flightClassController));
-app.use('/api/v1/segments',      createSegmentRouter(segmentController));
-app.use('/api/v1/promotions',    createPromotionRouter(promotionController));
-app.use('/api/flights',          createFlightRouter(flightController));
-app.use('/api/promotions',       createPromotionRouter(promotionController));
+app.use('/api/v1/segments',       createSegmentRouter(segmentController));
+app.use('/api/v1/promotions',     createPromotionRouter(promotionController));
+app.use('/api/flights',           createFlightRouter(flightController));
+app.use('/api/promotions',        createPromotionRouter(promotionController));
+
+// Rutas internas — solo accesibles con x-internal-api-key (servicio a servicio)
+app.use('/internal/flight-classes', createFlightClassInternalRouter(flightClassService));
+app.use('/internal/promotions',     createPromotionInternalRouter(promotionService));
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Ruta ${req.originalUrl} no encontrada` } });
