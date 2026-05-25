@@ -18,6 +18,11 @@ export function createProxyRouter(): Router {
     const proxy = createProxyMiddleware<any, any>({
       target: svc.url,
       changeOrigin: true,
+      pathRewrite: (path, req) => {
+        if (path === '/') return req.baseUrl;
+        if (path.startsWith('/?')) return `${req.baseUrl}${path.slice(1)}`;
+        return `${req.baseUrl}${path}`;
+      },
       on: {
         error: (err: Error, _req: any, res: any) => {
           breaker.recordFailure();

@@ -7,7 +7,12 @@ export class ReservationController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const data = await this.reservationService.create(req.user!.id, req.body);
+      const userId = req.user?.id ?? (req.body.userId as string | undefined);
+      if (!userId) {
+        res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'userId es requerido cuando no hay sesión activa' } });
+        return;
+      }
+      const data = await this.reservationService.create(userId, req.body);
       res.status(201).json({ success: true, data });
     } catch (err: any) {
       if (err.message === 'NO_AVAILABILITY') {
@@ -27,23 +32,23 @@ export class ReservationController {
 
   getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const data = await this.reservationService.getById(
-        String(req.params.id), req.user!.id, req.user!.role === 'ADMIN',
-      );
+      const userId  = req.user?.id ?? '';
+      const isAdmin = !req.user || req.user.role === 'ADMIN';
+      const data = await this.reservationService.getById(String(req.params.id), userId, isAdmin);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };
 
   cancel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const data = await this.reservationService.cancel(
-        String(req.params.id), req.user!.id, req.user!.role === 'ADMIN',
-      );
+      const userId  = req.user?.id ?? '';
+      const isAdmin = !req.user || req.user.role === 'ADMIN';
+      const data = await this.reservationService.cancel(String(req.params.id), userId, isAdmin);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };
 
-  listAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listAll = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const data = await this.reservationService.listAll();
       res.json({ success: true, data });

@@ -13,10 +13,10 @@ function isUniqueSeatConflict(err: any) {
 
 export function createReservationRouter(controller: ReservationController, db: PrismaClient): Router {
   const router = Router();
-  router.post('/',             authenticate, validate(CreateReservationSchema), controller.create);
+  router.post('/',             validate(CreateReservationSchema), controller.create);
   router.get('/my',            authenticate, controller.myReservations);
   router.get('/',              authenticate, requireAdmin, controller.listAll);
-  router.get('/flight-classes/:flightClassId/occupied-seats', authenticate, async (req: any, res: any, next: any) => {
+  router.get('/flight-classes/:flightClassId/occupied-seats', async (req: any, res: any, next: any) => {
     try {
       const seats = await db.reservationPassenger.findMany({
         where: {
@@ -34,10 +34,10 @@ export function createReservationRouter(controller: ReservationController, db: P
       });
     } catch (err) { next(err); }
   });
-  router.get('/:id',           authenticate, controller.getById);
-  router.delete('/:id',        authenticate, controller.cancel);
+  router.get('/:id',           controller.getById);
+  router.delete('/:id',        controller.cancel);
   // Angular service calls PATCH /cancel — keep in sync with DELETE /:id
-  router.patch('/:id/cancel',  authenticate, controller.cancel);
+  router.patch('/:id/cancel',  controller.cancel);
 
   // ── Asignación de asiento durante check-in ───────────────────
   router.patch('/:id/passengers/:passengerId/seat', authenticate, async (req: any, res: any, next: any) => {
