@@ -116,6 +116,7 @@ class=ECONOMY
 
 ```text
 POST   /api/v1/reservations
+POST   /api/v1/reservas/checkout   # alias compatible para integrador Booking
 GET    /api/v1/reservations/my
 GET    /api/v1/reservations/:id
 PATCH  /api/v1/reservations/:id/cancel

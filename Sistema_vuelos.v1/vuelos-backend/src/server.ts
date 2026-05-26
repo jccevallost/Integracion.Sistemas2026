@@ -208,6 +208,7 @@ app.get(['/', '/api/v1'], (_req, res) => {
       auth:                  '/api/v1/auth',
       flights:               '/api/v1/flights',
       reservations:          '/api/v1/reservations',
+      reservasCheckout:      '/api/v1/reservas/checkout',
       promotions:            '/api/v1/promotions',
       countries:             '/api/v1/countries',
       cities:                '/api/v1/cities',
@@ -239,6 +240,7 @@ app.get(['/', '/api/v1'], (_req, res) => {
 // Auth & Users
 app.use('/api/v1/auth',         createAuthRouter(authController));
 app.use('/api/v1/reservations', createReservationRouter(reservationController, prisma));
+app.use('/api/v1/reservas',     createReservationRouter(reservationController, prisma));
 app.use('/api/v1/promotions',   createPromotionRouter(promotionController));
 
 // Catálogos geográficos (GET público, mutaciones admin)

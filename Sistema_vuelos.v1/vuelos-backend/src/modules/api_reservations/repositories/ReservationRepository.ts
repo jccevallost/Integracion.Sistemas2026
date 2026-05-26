@@ -25,8 +25,31 @@ const fullInclude = {
   user: { select: { id: true, email: true, firstName: true, firstLastName: true } },
 };
 
+const bookingOnlyInclude = {
+  passengers: true,
+};
+
 export class ReservationRepository implements IReservationRepository {
-  constructor(private readonly db: PrismaClient) {}
+  private readonly include: any;
+
+  constructor(private readonly db: PrismaClient) {
+    this.include = this.resolveInclude();
+  }
+
+  private resolveInclude(): any {
+    const fields = (this.db as any)._runtimeDataModel?.models?.Reservation?.fields;
+    if (!Array.isArray(fields)) return fullInclude;
+
+    const relationNames = new Set(
+      fields
+        .filter((field: any) => field.kind === 'object')
+        .map((field: any) => field.name),
+    );
+
+    return ['flight', 'promotion', 'user'].every((name) => relationNames.has(name))
+      ? fullInclude
+      : bookingOnlyInclude;
+  }
 
   async findAll(page = 1, limit = 100): Promise<PagedResult<Reservation>> {
     const skip = (page - 1) * limit;
@@ -44,17 +67,17 @@ export class ReservationRepository implements IReservationRepository {
   async findByUserId(userId: string): Promise<any[]> {
     return this.db.reservation.findMany({
       where:   { userId },
-      include: fullInclude,
+      include: this.include,
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findByIdWithRelations(id: string): Promise<any | null> {
-    return this.db.reservation.findUnique({ where: { id }, include: fullInclude });
+    return this.db.reservation.findUnique({ where: { id }, include: this.include });
   }
 
   async findAllWithRelations(): Promise<any[]> {
-    return this.db.reservation.findMany({ include: fullInclude, orderBy: { createdAt: 'desc' } });
+    return this.db.reservation.findMany({ include: this.include, orderBy: { createdAt: 'desc' } });
   }
 
   async updateStatus(id: string, status: string): Promise<void> {
@@ -85,7 +108,7 @@ export class ReservationRepository implements IReservationRepository {
           })),
         },
       },
-      include: fullInclude,
+      include: this.include,
     }) as any;
   }
 

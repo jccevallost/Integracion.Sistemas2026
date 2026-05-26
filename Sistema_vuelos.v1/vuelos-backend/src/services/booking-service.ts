@@ -34,7 +34,7 @@ import { createReservationPassengerRouter }  from '../modules/api_reservation_pa
 import { createBillingProfileRouter }       from '../modules/api_billing_profiles/routes/billing-profiles.routes.js';
 import { createBoardingPassRouter }         from '../modules/api_boarding_passes/routes/boarding-passes.routes.js';
 
-const PORT = Number(process.env.BOOKING_SERVICE_PORT) || 3004;
+const PORT = Number(process.env.PORT ?? process.env.BOOKING_SERVICE_PORT) || 3004;
 
 validateJwtConfig();
 
@@ -82,6 +82,7 @@ app.get(['/health', '/'], (_req, res) => {
 });
 
 app.use('/api/v1/reservations',           createReservationRouter(reservationController, prisma));
+app.use('/api/v1/reservas',               createReservationRouter(reservationController, prisma));
 app.use('/api/v1/reservation-passengers', createReservationPassengerRouter(reservationPassengerController, prisma));
 app.use('/api/v1/billing-profiles',       createBillingProfileRouter(billingProfileController, prisma));
 app.use('/api/v1/boarding-passes',        createBoardingPassRouter(boardingPassController, prisma));

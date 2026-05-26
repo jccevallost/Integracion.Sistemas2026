@@ -48,7 +48,7 @@ function createEventPublisher(rules: EventRule[]): RequestHandler {
 export const bookingEventPublisher = createEventPublisher([
   {
     method:        'POST',
-    test:          (url) => /\/api\/v1\/reservations$/.test(url),
+    test:          (url) => /\/api\/v1\/(?:reservations|reservas\/checkout)$/.test(url),
     successStatus: 201,
     eventType:     DomainEvents.RESERVATION_CREATED,
     producer:      'booking-service',

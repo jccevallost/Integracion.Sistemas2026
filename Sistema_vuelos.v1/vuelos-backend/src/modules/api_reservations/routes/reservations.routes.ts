@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { ReservationController } from '../controllers/ReservationController.js';
-import { authenticate, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
+import { authenticate, authenticateOptional, requireAdmin } from '../../../shared/middlewares/auth.middleware.js';
 import { validate } from '../../../shared/middlewares/validate.middleware.js';
 import { CreateReservationSchema } from '../../../shared/schemas/validation.schemas.js';
 
@@ -13,7 +13,8 @@ function isUniqueSeatConflict(err: any) {
 
 export function createReservationRouter(controller: ReservationController, db: PrismaClient): Router {
   const router = Router();
-  router.post('/',             validate(CreateReservationSchema), controller.create);
+  router.post('/',             authenticateOptional, validate(CreateReservationSchema), controller.create);
+  router.post('/checkout',     authenticateOptional, validate(CreateReservationSchema), controller.create);
   router.get('/my',            authenticate, controller.myReservations);
   router.get('/',              authenticate, requireAdmin, controller.listAll);
   router.get('/flight-classes/:flightClassId/occupied-seats', async (req: any, res: any, next: any) => {

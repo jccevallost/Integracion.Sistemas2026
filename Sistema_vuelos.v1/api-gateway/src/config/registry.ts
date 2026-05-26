@@ -43,6 +43,7 @@ export const registry: ServiceConfig[] = [
     url: process.env.BOOKING_SERVICE_URL ?? `${BASE}:3004`,
     pathPrefixes: [
       '/api/v1/reservations',
+      '/api/v1/reservas',
       '/api/v1/reservation-passengers',
       '/api/v1/billing-profiles',
       '/api/v1/boarding-passes',

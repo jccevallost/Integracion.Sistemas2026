@@ -18,7 +18,7 @@ const USE_DB_DIRECT = process.env.AUTH_DATABASE_ACCESS === 'direct';
 
 async function verifyTokenLiveness(userId: string, tokenVersion: number): Promise<boolean> {
   if (USE_DB_DIRECT) {
-    // Dynamic import so non-auth services never load prisma.auth.client
+    // Dynamic import so non-auth services never load prisma.auth.client.
     const { default: prisma } = await import('../database/prisma.auth.client.js');
     const db = prisma as any;
     const dbUser = await db.user.findUnique({
@@ -32,6 +32,16 @@ async function verifyTokenLiveness(userId: string, tokenVersion: number): Promis
   return result.valid;
 }
 
+async function resolveUserFromToken(token: string): Promise<{ id: string; email: string; role: string } | null> {
+  const payload = jwt.verify(token, getJwtSecret(), getJwtVerifyOptions()) as any;
+  const payloadVersion = payload.tokenVersion ?? 0;
+  const valid = await verifyTokenLiveness(payload.id, payloadVersion);
+
+  if (!valid) return null;
+
+  return { id: payload.id, email: payload.email, role: payload.role };
+}
+
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
@@ -40,27 +50,47 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   try {
-    const token   = header.slice(7);
-    const payload = jwt.verify(token, getJwtSecret(), getJwtVerifyOptions()) as any;
-
-    const payloadVersion = payload.tokenVersion ?? 0;
-    const valid = await verifyTokenLiveness(payload.id, payloadVersion);
-
-    if (!valid) {
-      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token inválido o expirado' } });
+    const user = await resolveUserFromToken(header.slice(7));
+    if (!user) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token invalido o expirado' } });
       return;
     }
 
-    req.user = { id: payload.id, email: payload.email, role: payload.role };
+    req.user = user;
     next();
   } catch {
-    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token inválido o expirado' } });
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token invalido o expirado' } });
+  }
+}
+
+export async function authenticateOptional(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const header = req.headers.authorization;
+  if (!header) {
+    next();
+    return;
+  }
+  if (!header.startsWith('Bearer ')) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token invalido o expirado' } });
+    return;
+  }
+
+  try {
+    const user = await resolveUserFromToken(header.slice(7));
+    if (!user) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token invalido o expirado' } });
+      return;
+    }
+
+    req.user = user;
+    next();
+  } catch {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Token invalido o expirado' } });
   }
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {
-    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Autenticación requerida' } });
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Autenticacion requerida' } });
     return;
   }
   if (req.user.role !== 'ADMIN') {

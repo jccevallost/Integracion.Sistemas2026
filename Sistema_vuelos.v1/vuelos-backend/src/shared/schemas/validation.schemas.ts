@@ -204,6 +204,7 @@ const PassengerSchema = z.object({
 });
 
 export const CreateReservationSchema = z.object({
+  userId:         uuid.optional(),
   flightClassId:  uuid,
   passengers:     z.array(PassengerSchema).min(1, { message: 'Se requiere al menos un pasajero' }),
   promotionCode:  z.string().optional(),
