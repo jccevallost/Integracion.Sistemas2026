@@ -6,9 +6,9 @@ export function createReservationHandlers(reservationService: ReservationService
   return {
     async CreateReservation(call: any, callback: any) {
       try {
-        await verifyServiceToken(call.metadata);
+        const caller = await verifyServiceToken(call.metadata);
         const { flight_class_id, passengers, promotion_code, user_id } = call.request;
-        const result = await reservationService.create(user_id, {
+        const result = await reservationService.create(user_id || caller.id, {
           flightClassId: flight_class_id,
           passengers: (passengers ?? []).map((p: any) => ({
             firstName: p.first_name,
