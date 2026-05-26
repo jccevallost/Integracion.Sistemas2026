@@ -14,11 +14,8 @@ export class ReservationController {
       const userId =
         req.user?.id ??
         (req.body.userId as string | undefined) ??
-        (Array.isArray(headerUserId) ? headerUserId[0] : headerUserId);
-      if (!userId) {
-        res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'userId es requerido cuando no hay sesión activa' } });
-        return;
-      }
+        (Array.isArray(headerUserId) ? headerUserId[0] : headerUserId) ??
+        null;
       const data = await this.reservationService.create(userId, req.body);
       res.status(201).json({ success: true, data });
     } catch (err: any) {

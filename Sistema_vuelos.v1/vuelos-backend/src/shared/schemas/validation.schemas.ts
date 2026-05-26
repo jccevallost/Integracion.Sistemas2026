@@ -208,6 +208,10 @@ export const CreateReservationSchema = z.object({
   flightClassId:  uuid,
   passengers:     z.array(PassengerSchema).min(1, { message: 'Se requiere al menos un pasajero' }),
   promotionCode:  z.string().optional(),
+  // Campos del sistema de booking externo (se aceptan y pasan como referencia)
+  idCarrito:      z.string().optional(),
+  metodoPagoId:   z.string().optional(),
+  currency:       z.string().optional(),
 });
 
 // ── Payments ──────────────────────────────────────────────────────────────────

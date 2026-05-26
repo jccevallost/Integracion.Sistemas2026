@@ -93,7 +93,8 @@ export class ReservationRepository implements IReservationRepository {
     return this.db.reservation.create({
       data: {
         reservationCode: data.reservationCode,
-        userId:          data.userId,
+        userId:          data.userId ?? null,
+        externalCartId:  data.externalCartId ?? null,
         flightId:        data.flightId,
         promotionId:     data.promotionId,
         totalAmount:     data.totalAmount,
