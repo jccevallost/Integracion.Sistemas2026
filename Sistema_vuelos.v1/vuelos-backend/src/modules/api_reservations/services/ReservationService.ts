@@ -73,7 +73,6 @@ export class ReservationService implements IReservationService {
     try {
       reservation = await this.reservationRepository.create({
         userId:           userId ?? null,
-        externalCartId:   dto.idCarrito ?? null,
         flightId:         (flightClass as any).flightId,
         promotionId,
         reservationCode:  this.generateCode(),

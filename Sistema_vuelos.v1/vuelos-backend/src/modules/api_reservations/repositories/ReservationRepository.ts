@@ -94,7 +94,6 @@ export class ReservationRepository implements IReservationRepository {
       data: {
         reservationCode: data.reservationCode,
         userId:          data.userId ?? null,
-        externalCartId:  data.externalCartId ?? null,
         flightId:        data.flightId,
         promotionId:     data.promotionId,
         totalAmount:     data.totalAmount,
