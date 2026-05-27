@@ -169,6 +169,9 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
+// ── Archivos estáticos (verificación de dominio AppScan, etc.) ─
+app.use(express.static('public'));
+
 // ── Correlation ID ───────────────────────────────────────────
 app.use((req, res, next) => {
   const cid = (req.headers['x-correlation-id'] as string) || randomUUID();
