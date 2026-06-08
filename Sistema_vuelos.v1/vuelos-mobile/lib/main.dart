@@ -674,6 +674,14 @@ class _SearchScreenState extends State<SearchScreen> {
         statusText = 'No se pudieron cargar recomendados: ${err.message}';
       });
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      final message = connectionErrorMessage(err);
+      setState(() {
+        flights = [];
+        statusText = message;
+      });
+      showMessage(context, message);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -718,6 +726,11 @@ class _SearchScreenState extends State<SearchScreen> {
         () => statusText = 'No se pudo consultar la ruta: ${err.message}',
       );
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      final message = connectionErrorMessage(err);
+      setState(() => statusText = message);
+      showMessage(context, message);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -765,6 +778,11 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       setState(() => statusText = 'No se pudo buscar: ${err.message}');
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      final message = connectionErrorMessage(err);
+      setState(() => statusText = message);
+      showMessage(context, message);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1204,6 +1222,9 @@ class _TripsScreenState extends State<TripsScreen> {
     } on ApiException catch (err) {
       if (!mounted) return;
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      showMessage(context, connectionErrorMessage(err));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1328,6 +1349,9 @@ class _AccountScreenState extends State<AccountScreen> {
     } on ApiException catch (err) {
       if (!mounted) return;
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      showMessage(context, connectionErrorMessage(err));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1365,6 +1389,9 @@ class _AccountScreenState extends State<AccountScreen> {
     } on ApiException catch (err) {
       if (!mounted) return;
       showMessage(context, err.message);
+    } catch (err) {
+      if (!mounted) return;
+      showMessage(context, connectionErrorMessage(err));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1648,6 +1675,9 @@ Future<void> showReservationSheet(
             } on ApiException catch (err) {
               if (!context.mounted) return;
               showMessage(context, err.message);
+            } catch (err) {
+              if (!context.mounted) return;
+              showMessage(context, connectionErrorMessage(err));
             } finally {
               if (context.mounted) setState(() => loading = false);
             }
@@ -1745,6 +1775,9 @@ Future<void> showReservationDetailSheet(
             } on ApiException catch (err) {
               if (!context.mounted) return;
               showMessage(context, err.message);
+            } catch (err) {
+              if (!context.mounted) return;
+              showMessage(context, connectionErrorMessage(err));
             } finally {
               if (context.mounted) setState(() => paying = false);
             }
@@ -1913,6 +1946,11 @@ Future<void> showReservationDetailSheet(
 
 void showMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+String connectionErrorMessage(Object error) {
+  if (error is ApiException) return error.message;
+  return 'No se pudo conectar con la API. Revisa Internet o espera a que Render termine de iniciar.';
 }
 
 String formatDateTime(String value) {
