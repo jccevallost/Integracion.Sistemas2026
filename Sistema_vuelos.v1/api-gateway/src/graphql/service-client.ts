@@ -4,17 +4,27 @@ export class ServiceClient {
   constructor(
     private readonly baseUrl: string,
     private readonly token?: string,
+    private readonly correlationId?: string,
+    private readonly timeoutMs: number = 5000,
   ) {}
 
   private headers(): Record<string, string> {
     return {
       'Content-Type': 'application/json',
       ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+      ...(this.correlationId ? { 'x-correlation-id': this.correlationId } : {}),
     };
   }
 
-  async get<T>(path: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, { headers: this.headers() });
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: { ...this.headers(), ...(init.headers ?? {}) },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as Record<string, unknown>;
       const msg = (body?.error as Record<string, unknown>)?.message ?? `HTTP ${res.status}`;
@@ -22,35 +32,23 @@ export class ServiceClient {
     }
     const body = await res.json() as { success: boolean; data: T };
     return body.data;
+  }
+
+  async get<T>(path: string): Promise<T> {
+    return this.request<T>(path);
   }
 
   async post<T>(path: string, payload: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    return this.request<T>(path, {
       method: 'POST',
-      headers: this.headers(),
       body: JSON.stringify(payload),
     });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-      const msg = (body?.error as Record<string, unknown>)?.message ?? `HTTP ${res.status}`;
-      throw new Error(String(msg));
-    }
-    const body = await res.json() as { success: boolean; data: T };
-    return body.data;
   }
 
   async patch<T>(path: string, payload: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    return this.request<T>(path, {
       method: 'PATCH',
-      headers: this.headers(),
       body: JSON.stringify(payload),
     });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-      const msg = (body?.error as Record<string, unknown>)?.message ?? `HTTP ${res.status}`;
-      throw new Error(String(msg));
-    }
-    const body = await res.json() as { success: boolean; data: T };
-    return body.data;
   }
 }

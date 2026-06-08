@@ -2,7 +2,15 @@
 import type { PrismaClient } from '@prisma/client';
 
 export class PaymentQueryRepository {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(
+    private readonly db: PrismaClient,
+    private readonly options: { includeReservation?: boolean } = {},
+  ) {}
+
+  private relationInclude() {
+    if (this.options.includeReservation === false) return undefined;
+    return { reservation: { select: { id: true, reservationCode: true, totalAmount: true } } };
+  }
 
   async getStats() {
     const [total, byStatus, totalRevenue] = await Promise.all([
@@ -20,14 +28,14 @@ export class PaymentQueryRepository {
   async findByReservation(reservationId: string) {
     return this.db.payment.findMany({
       where: { reservationId },
-      include: { reservation: { select: { id: true, reservationCode: true, totalAmount: true } } },
+      include: this.relationInclude(),
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findAll() {
     return this.db.payment.findMany({
-      include: { reservation: { select: { id: true, reservationCode: true, totalAmount: true } } },
+      include: this.relationInclude(),
       orderBy: { createdAt: 'desc' },
     });
   }

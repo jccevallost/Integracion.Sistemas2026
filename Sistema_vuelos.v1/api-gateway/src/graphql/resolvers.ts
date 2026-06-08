@@ -35,7 +35,7 @@ export const resolvers = {
       args: { origin: string; destination: string; date: string; passengers?: number; cabinClass?: string },
       ctx: GraphQLContext,
     ) {
-      const client = new ServiceClient(ctx.services.flights, ctx.token);
+      const client = new ServiceClient(ctx.services.flights, ctx.token, ctx.correlationId);
       const qs = new URLSearchParams({ origin: args.origin, destination: args.destination, date: args.date });
       if (args.passengers) qs.set('passengers', String(args.passengers));
       if (args.cabinClass)  qs.set('class', args.cabinClass);
@@ -54,14 +54,14 @@ export const resolvers = {
      */
     async reservation(_: unknown, args: { id: string }, ctx: GraphQLContext) {
       requireAuth(ctx);
-      const client = new ServiceClient(ctx.services.booking, ctx.token);
+      const client = new ServiceClient(ctx.services.booking, ctx.token, ctx.correlationId);
       return client.get<R>(`/api/v1/reservations/${args.id}`);
     },
 
     async myReservations(_: unknown, _args: unknown, ctx: GraphQLContext) {
       requireAuth(ctx);
-      const client = new ServiceClient(ctx.services.booking, ctx.token);
-      return client.get<R[]>(`/api/v1/reservations?userId=${ctx.userId}`);
+      const client = new ServiceClient(ctx.services.booking, ctx.token, ctx.correlationId);
+      return client.get<R[]>(`/api/v1/reservations/my`);
     },
   },
 
@@ -74,9 +74,16 @@ export const resolvers = {
       ctx: GraphQLContext,
     ) {
       requireAuth(ctx);
-      const client = new ServiceClient(ctx.services.booking, ctx.token);
+      const client = new ServiceClient(ctx.services.booking, ctx.token, ctx.correlationId);
+      const passenger = await client.get<R>(`/api/v1/reservation-passengers/${args.passengerId}`);
+      const reservationId = passenger.reservationId as string | undefined;
+      if (!reservationId) {
+        throw new GraphQLError('No se pudo resolver la reserva del pasajero', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
       return client.patch<R>(
-        `/api/v1/reservation-passengers/${args.passengerId}/seat`,
+        `/api/v1/reservations/${reservationId}/passengers/${args.passengerId}/seat`,
         { seatNumber: args.seat },
       );
     },
@@ -87,7 +94,7 @@ export const resolvers = {
       ctx: GraphQLContext,
     ) {
       requireAuth(ctx);
-      const client = new ServiceClient(ctx.services.payments, ctx.token);
+      const client = new ServiceClient(ctx.services.payments, ctx.token, ctx.correlationId);
       return client.post<R>('/api/v1/passenger-services', {
         passengerId:     args.passengerId,
         serviceConfigId: args.serviceConfigId,
@@ -169,8 +176,8 @@ export const resolvers = {
     // payments-service — llamada paralela al resolver de la reserva
     async payments(parent: R, _: unknown, ctx: GraphQLContext) {
       try {
-        const client = new ServiceClient(ctx.services.payments, ctx.token);
-        return await client.get<R[]>(`/api/v1/payments?reservationId=${parent.id}`);
+        const client = new ServiceClient(ctx.services.payments, ctx.token, ctx.correlationId);
+        return await client.get<R[]>(`/api/v1/payments/by-reservation/${parent.id}`);
       } catch {
         return [];
       }
@@ -179,8 +186,14 @@ export const resolvers = {
     // boarding-passes — otra llamada paralela a booking-service
     async boardingPasses(parent: R, _: unknown, ctx: GraphQLContext) {
       try {
-        const client = new ServiceClient(ctx.services.booking, ctx.token);
-        return await client.get<R[]>(`/api/v1/boarding-passes?reservationId=${parent.id}`);
+        const client = new ServiceClient(ctx.services.booking, ctx.token, ctx.correlationId);
+        const passengers = (parent.passengers as R[] | undefined) ?? [];
+        const batches = await Promise.allSettled(
+          passengers.map((passenger) =>
+            client.get<R[]>(`/api/v1/boarding-passes/by-passenger/${passenger.id}`),
+          ),
+        );
+        return batches.flatMap((batch) => (batch.status === 'fulfilled' ? batch.value : []));
       } catch {
         return [];
       }

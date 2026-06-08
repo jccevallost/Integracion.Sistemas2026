@@ -8,6 +8,15 @@ import { CreateFlightClassSchema, UpdateFlightClassSchema, CreateSegmentSchema, 
 import type { ZodSchema } from 'zod';
 import type { PrismaClient } from '@prisma/client';
 
+type AdminRouterClients = {
+  auth?: PrismaClient;
+  catalog?: PrismaClient;
+  flights?: PrismaClient;
+  booking?: PrismaClient;
+  payments?: PrismaClient;
+  audit?: PrismaClient;
+};
+
 async function audit(db: PrismaClient, req: any, action: string, entity: string, entityId: string, oldData: any, newData: any) {
   try {
     await db.auditLog.create({
@@ -32,6 +41,7 @@ function makeGenericRouter(
   include?: object,
   schemas?: { create?: ZodSchema; update?: ZodSchema },
   customDelete?: (req: any, res: any, next: any) => Promise<void>,
+  auditDb: PrismaClient = db,
 ): Router {
   const entityName = String(model);
   const router = Router();
@@ -52,7 +62,7 @@ function makeGenericRouter(
   router.post('/', ...createMiddlewares, async (req: any, res: any, next: any) => {
     try {
       const data = await (db as any)[model].create({ data: req.body, include });
-      await audit(db, req, 'CREATE', entityName, data.id, null, data);
+      await audit(auditDb, req, 'CREATE', entityName, data.id, null, data);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
@@ -62,7 +72,7 @@ function makeGenericRouter(
       const id = String(req.params.id);
       const oldData = await (db as any)[model].findUnique({ where: { id } });
       const data = await (db as any)[model].update({ where: { id }, data: req.body, include });
-      await audit(db, req, 'UPDATE', entityName, id, oldData, data);
+      await audit(auditDb, req, 'UPDATE', entityName, id, oldData, data);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   };
@@ -76,7 +86,7 @@ function makeGenericRouter(
         const id = String(req.params.id);
         const oldData = await (db as any)[model].findUnique({ where: { id } });
         await (db as any)[model].delete({ where: { id } });
-        await audit(db, req, 'DELETE', entityName, id, oldData, null);
+        await audit(auditDb, req, 'DELETE', entityName, id, oldData, null);
         res.json({ success: true, data: { deleted: true } });
       } catch (err) { next(err); }
     });
@@ -84,9 +94,17 @@ function makeGenericRouter(
   return router;
 }
 
-export function createAdminRouter(controller: AdminController, db: PrismaClient): Router {
+export function createAdminRouter(controller: AdminController, db: PrismaClient, clients: AdminRouterClients = {}): Router {
   const router = Router();
   const auth = [authenticate, requireAdmin];
+  const authDb = clients.auth ?? db;
+  const catalogDb = clients.catalog ?? db;
+  const flightsDb = clients.flights ?? db;
+  const bookingDb = clients.booking ?? db;
+  const paymentsDb = clients.payments ?? db;
+  const auditDb = clients.audit ?? db;
+  const splitDomains = Object.keys(clients).length > 0;
+  const includeIfAvailable = <T extends object>(include: T): T | undefined => (splitDomains ? undefined : include);
 
   // Dashboard
   router.get('/dashboard', ...auth, controller.dashboard);
@@ -101,13 +119,13 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
       const passwordHash = await bcrypt.default.hash(String(password), 10);
       let cityId = rawCityId;
       if (!cityId) {
-        const city = await db.city.findFirst({ select: { id: true }, orderBy: { name: 'asc' } });
+        const city = await catalogDb.city.findFirst({ select: { id: true }, orderBy: { name: 'asc' } });
         cityId = city?.id;
       }
       const mainAddress = rest.mainAddress ?? 'Sin dirección';
-      const user = await db.user.create({
+      const user = await authDb.user.create({
         data: { ...rest, mainAddress, cityId, passwordHash },
-        include: { city: { include: { country: true } } },
+        include: includeIfAvailable({ city: { include: { country: true } } }),
       });
       const { passwordHash: _ph, ...safe } = user as any;
       res.status(201).json({ success: true, data: safe });
@@ -122,10 +140,10 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
       if (password)   updateData.passwordHash = await bcrypt.default.hash(String(password), 10);
       if (birthDate)  updateData.birthDate    = new Date(birthDate);
       if (cityId)     updateData.cityId       = cityId;
-      const user = await db.user.update({
+      const user = await authDb.user.update({
         where: { id: String(req.params.id) },
         data: updateData,
-        include: { city: { include: { country: true } } },
+        include: includeIfAvailable({ city: { include: { country: true } } }),
       });
       const { passwordHash: _ph, ...safe } = user as any;
       res.json({ success: true, data: safe });
@@ -136,26 +154,26 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
   router.delete('/users/:id', ...auth, controller.deleteUser);
 
   // ── Catálogos geográficos ────────────────────────────────────
-  router.use('/countries', ...auth, makeGenericRouter(db, 'country'));
-  router.use('/cities',    ...auth, makeGenericRouter(db, 'city',    { country: true }));
-  router.use('/airports',  ...auth, makeGenericRouter(db, 'airport', { city: { include: { country: true } } }));
+  router.use('/countries', ...auth, makeGenericRouter(catalogDb, 'country', undefined, undefined, undefined, auditDb));
+  router.use('/cities',    ...auth, makeGenericRouter(catalogDb, 'city',    includeIfAvailable({ country: true }), undefined, undefined, auditDb));
+  router.use('/airports',  ...auth, makeGenericRouter(catalogDb, 'airport', includeIfAvailable({ city: { include: { country: true } } }), undefined, undefined, auditDb));
 
   // ── Aerolíneas y aeronaves ───────────────────────────────────
-  router.use('/airlines',  ...auth, makeGenericRouter(db, 'airline',  { country: true }));
-  router.use('/aircraft',  ...auth, makeGenericRouter(db, 'aircraft', { airline: true }));
+  router.use('/airlines',  ...auth, makeGenericRouter(catalogDb, 'airline',  includeIfAvailable({ country: true }), undefined, undefined, auditDb));
+  router.use('/aircraft',  ...auth, makeGenericRouter(catalogDb, 'aircraft', includeIfAvailable({ airline: true }), undefined, undefined, auditDb));
 
   // ── Relación aerolínea-aeropuerto ───────────────────────────
   router.get('/airline-airports', ...auth, async (_req, res, next) => {
     try {
-      const data = await db.airlineAirport.findMany({ include: { airline: true, airport: true } });
+      const data = await catalogDb.airlineAirport.findMany({ include: includeIfAvailable({ airline: true, airport: true }) });
       res.json({ success: true, data: { data, pagination: { total: data.length } } });
     } catch (err) { next(err); }
   });
   router.post('/airline-airports', ...auth, async (req, res, next) => {
     try {
       const { airlineId, airportId } = req.body;
-      const data = await db.airlineAirport.create({ data: { airlineId, airportId }, include: { airline: true, airport: true } });
-      await audit(db, req, 'CREATE', 'airlineAirport', `${airlineId}_${airportId}`, null, data);
+      const data = await catalogDb.airlineAirport.create({ data: { airlineId, airportId }, include: includeIfAvailable({ airline: true, airport: true }) });
+      await audit(auditDb, req, 'CREATE', 'airlineAirport', `${airlineId}_${airportId}`, null, data);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
@@ -163,31 +181,40 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
     try {
       const airlineId = String(req.params.airlineId);
       const airportId = String(req.params.airportId);
-      const oldData = await db.airlineAirport.findFirst({ where: { airlineId, airportId } });
-      await db.airlineAirport.delete({ where: { airlineId_airportId: { airlineId: String(airlineId), airportId: String(airportId) } } });
-      await audit(db, req, 'DELETE', 'airlineAirport', `${airlineId}_${airportId}`, oldData, null);
+      const oldData = await catalogDb.airlineAirport.findFirst({ where: { airlineId, airportId } });
+      await catalogDb.airlineAirport.delete({ where: { airlineId_airportId: { airlineId: String(airlineId), airportId: String(airportId) } } });
+      await audit(auditDb, req, 'DELETE', 'airlineAirport', `${airlineId}_${airportId}`, oldData, null);
       res.json({ success: true, data: { deleted: true } });
     } catch (err) { next(err); }
   });
 
   // ── Vuelos ──────────────────────────────────────────────────
-  router.use('/flightclasses', ...auth, makeGenericRouter(db, 'flightClass', { flight: true }, { create: CreateFlightClassSchema, update: UpdateFlightClassSchema }));
-  router.use('/segments',      ...auth, makeGenericRouter(db, 'segment', {
+  router.use('/flightclasses', ...auth, makeGenericRouter(flightsDb, 'flightClass', includeIfAvailable({ flight: true }), { create: CreateFlightClassSchema, update: UpdateFlightClassSchema }, undefined, auditDb));
+  router.use('/segments',      ...auth, makeGenericRouter(flightsDb, 'segment', includeIfAvailable({
     originAirport: true,
     destinationAirport: true,
     airline: true,
     aircraft: true,
-  }, { create: CreateSegmentSchema, update: UpdateSegmentSchema }));
+  }), { create: CreateSegmentSchema, update: UpdateSegmentSchema }, undefined, auditDb));
 
   // ── Reservas y pasajeros ────────────────────────────────────
   router.use('/reservations', ...auth, makeGenericRouter(
-    db, 'reservation',
-    { passengers: true, flight: true, user: { select: { id: true, email: true, firstName: true, firstLastName: true } } },
+    bookingDb, 'reservation',
+    includeIfAvailable({ passengers: true, flight: true, user: { select: { id: true, email: true, firstName: true, firstLastName: true } } }),
     undefined,
     async (req, res, next) => {
       const id = String(req.params.id);
       try {
-        await db.$transaction(async (tx) => {
+        const payment = await paymentsDb.payment.findUnique({ where: { reservationId: id }, select: { id: true } });
+        if (payment) {
+          const invoice = await paymentsDb.invoice.findUnique({ where: { paymentId: payment.id }, select: { id: true } });
+          if (invoice) {
+            await paymentsDb.invoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
+            await paymentsDb.invoice.delete({ where: { id: invoice.id } });
+          }
+          await paymentsDb.payment.delete({ where: { id: payment.id } });
+        }
+        await bookingDb.$transaction(async (tx) => {
           const passengers = await tx.reservationPassenger.findMany({ where: { reservationId: id }, select: { id: true } });
           const pids = passengers.map((p) => p.id);
           if (pids.length) {
@@ -195,63 +222,55 @@ export function createAdminRouter(controller: AdminController, db: PrismaClient)
             await tx.boardingPass.deleteMany({ where: { passengerId: { in: pids } } });
             await tx.reservationPassenger.deleteMany({ where: { reservationId: id } });
           }
-          const payment = await tx.payment.findUnique({ where: { reservationId: id }, select: { id: true } });
-          if (payment) {
-            const invoice = await tx.invoice.findUnique({ where: { paymentId: payment.id }, select: { id: true } });
-            if (invoice) {
-              await tx.invoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
-              await tx.invoice.delete({ where: { id: invoice.id } });
-            }
-            await tx.payment.delete({ where: { id: payment.id } });
-          }
           await tx.reservation.delete({ where: { id } });
         });
-        await audit(db, req, 'DELETE', 'reservation', id, null, null);
+        await audit(auditDb, req, 'DELETE', 'reservation', id, null, null);
         res.json({ success: true, data: { deleted: true } });
       } catch (err) { next(err); }
     },
+    auditDb,
   ));
-  router.use('/reservation-passengers', ...auth, makeGenericRouter(db, 'reservationPassenger', {
+  router.use('/reservation-passengers', ...auth, makeGenericRouter(bookingDb, 'reservationPassenger', includeIfAvailable({
     reservation: { select: { id: true, reservationCode: true } },
     flightClass: true,
-  }));
+  }), undefined, undefined, auditDb));
 
   // ── Servicios y configuración ───────────────────────────────
-  router.use('/servicecatalog',        ...auth, makeGenericRouter(db, 'serviceCatalog'));
-  router.use('/airline-service-config',...auth, makeGenericRouter(db, 'airlineServiceConfig', {
+  router.use('/servicecatalog',        ...auth, makeGenericRouter(catalogDb, 'serviceCatalog', undefined, undefined, undefined, auditDb));
+  router.use('/airline-service-config',...auth, makeGenericRouter(catalogDb, 'airlineServiceConfig', includeIfAvailable({
     service: true,
     airline: true,
-  }));
-  router.use('/passenger-services', ...auth, makeGenericRouter(db, 'passengerService', {
+  }), undefined, undefined, auditDb));
+  router.use('/passenger-services', ...auth, makeGenericRouter(bookingDb, 'passengerService', includeIfAvailable({
     passenger: true,
     serviceConfig: { include: { service: true } },
-  }));
+  }), undefined, undefined, auditDb));
 
   // ── Promociones ─────────────────────────────────────────────
-  router.use('/promotions', ...auth, makeGenericRouter(db, 'promotion'));
+  router.use('/promotions', ...auth, makeGenericRouter(flightsDb, 'promotion', undefined, undefined, undefined, auditDb));
 
   // ── Pagos y facturación ─────────────────────────────────────
-  router.use('/payments', ...auth, makeGenericRouter(db, 'payment', {
+  router.use('/payments', ...auth, makeGenericRouter(paymentsDb, 'payment', includeIfAvailable({
     reservation: { select: { id: true, reservationCode: true, totalAmount: true } },
-  }));
-  router.use('/billing-profiles', ...auth, makeGenericRouter(db, 'billingProfile', {
+  }), undefined, undefined, auditDb));
+  router.use('/billing-profiles', ...auth, makeGenericRouter(paymentsDb, 'billingProfile', includeIfAvailable({
     city: { include: { country: true } },
-  }));
-  router.use('/invoices', ...auth, makeGenericRouter(db, 'invoice', {
+  }), undefined, undefined, auditDb));
+  router.use('/invoices', ...auth, makeGenericRouter(paymentsDb, 'invoice', includeIfAvailable({
     payment: true,
     billingProfile: true,
     items: true,
-  }));
-  router.use('/invoice-items', ...auth, makeGenericRouter(db, 'invoiceItem'));
+  }), undefined, undefined, auditDb));
+  router.use('/invoice-items', ...auth, makeGenericRouter(paymentsDb, 'invoiceItem', undefined, undefined, undefined, auditDb));
 
   // ── Embarque ────────────────────────────────────────────────
-  router.use('/boarding-passes', ...auth, makeGenericRouter(db, 'boardingPass', {
+  router.use('/boarding-passes', ...auth, makeGenericRouter(bookingDb, 'boardingPass', includeIfAvailable({
     passenger: true,
     segment: { include: { originAirport: true, destinationAirport: true, airline: true } },
-  }));
+  }), undefined, undefined, auditDb));
 
   // ── Auditoría ────────────────────────────────────────────────
-  router.use('/auditlogs', ...auth, makeGenericRouter(db, 'auditLog'));
+  router.use('/auditlogs', ...auth, makeGenericRouter(auditDb, 'auditLog'));
 
   return router;
 }

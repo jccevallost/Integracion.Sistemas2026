@@ -13,6 +13,7 @@ export class PaymentService implements IPaymentService {
     private readonly billingProfileRepo: IBillingProfileRepository,
     private readonly invoiceRepo: IInvoiceRepository,
     private readonly prisma: PrismaClient,
+    private readonly userDb: PrismaClient = prisma,
   ) {}
 
   async listAll() { return this.repo.findAllWithRelations(); }
@@ -39,7 +40,7 @@ export class PaymentService implements IPaymentService {
     let billing = await this.billingProfileRepo.findDefaultByUser(userId);
 
     if (!billing) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const user = await this.userDb.user.findUnique({ where: { id: userId } });
       if (!user) return;
       billing = await this.billingProfileRepo.create({
         userId,

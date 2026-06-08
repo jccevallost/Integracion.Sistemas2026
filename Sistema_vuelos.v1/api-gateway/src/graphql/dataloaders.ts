@@ -10,8 +10,8 @@ type AnyRecord = Record<string, unknown>;
  * Ejemplo: 10 vuelos en flightSearch → solo 10 fetch (no 10×2 = 20)
  * porque DataLoader agrupa y deduplica las cargas del mismo request.
  */
-export function createLoaders(catalogUrl: string, token?: string) {
-  const client = new ServiceClient(catalogUrl, token);
+export function createLoaders(catalogUrl: string, token?: string, correlationId?: string) {
+  const client = new ServiceClient(catalogUrl, token, correlationId);
 
   // Carga aeropuertos por código IATA (ya presentes en la respuesta de vuelos)
   const airportLoader = new DataLoader<string, AnyRecord | null>(

@@ -2,7 +2,15 @@
 import type { PrismaClient } from '@prisma/client';
 
 export class PassengerServiceQueryRepository {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(
+    private readonly db: PrismaClient,
+    private readonly options: { includeServiceConfig?: boolean } = {},
+  ) {}
+
+  private relationInclude() {
+    if (this.options.includeServiceConfig === false) return { passenger: true };
+    return { passenger: true, serviceConfig: { include: { service: true } } };
+  }
 
   async getStats() {
     const [total, totalRevenue] = await Promise.all([
@@ -15,13 +23,13 @@ export class PassengerServiceQueryRepository {
   async findByPassenger(passengerId: string) {
     return this.db.passengerService.findMany({
       where: { passengerId },
-      include: { passenger: true, serviceConfig: { include: { service: true } } },
+      include: this.relationInclude(),
     });
   }
 
   async findAll() {
     return this.db.passengerService.findMany({
-      include: { passenger: true, serviceConfig: { include: { service: true } } },
+      include: this.relationInclude(),
     });
   }
 }

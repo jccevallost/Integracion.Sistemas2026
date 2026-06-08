@@ -5,6 +5,9 @@ import { registerAuditSubscriber } from '../shared/events/audit-subscriber.js';
 import { paymentsEventPublisher } from '../shared/events/event-publisher.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
 import prisma from '../shared/database/prisma.payments.client.js';
+import prismaAuth from '../shared/database/prisma.auth.client.js';
+import prismaBooking from '../shared/database/prisma.booking.client.js';
+import prismaCatalog from '../shared/database/prisma.catalog.client.js';
 
 import { PaymentRepository }         from '../modules/api_payments/repositories/PaymentRepository.js';
 import { InvoiceRepository }         from '../modules/api_invoices/repositories/InvoiceRepository.js';
@@ -40,20 +43,20 @@ const PORT = Number(process.env.PAYMENTS_SERVICE_PORT) || 3005;
 validateJwtConfig();
 
 // Repositories
-const paymentRepo         = new PaymentRepository(prisma);
+const paymentRepo         = new PaymentRepository(prisma, { includeReservation: false });
 const invoiceRepo         = new InvoiceRepository(prisma);
 const invoiceItemRepo     = new InvoiceItemRepository(prisma);
-const passengerServiceRepo = new PassengerServiceRepository(prisma);
-const billingProfileRepo  = new BillingProfileRepository(prisma);
+const passengerServiceRepo = new PassengerServiceRepository(prismaBooking as any, { includeServiceConfig: false });
+const billingProfileRepo  = new BillingProfileRepository(prisma, { includeCity: false });
 
 // Query repos
-const paymentQuery         = new PaymentQueryRepository(prisma);
+const paymentQuery         = new PaymentQueryRepository(prisma, { includeReservation: false });
 const invoiceQuery         = new InvoiceQueryRepository(prisma);
 const invoiceItemQuery     = new InvoiceItemQueryRepository(prisma);
-const passengerServiceQuery = new PassengerServiceQueryRepository(prisma);
+const passengerServiceQuery = new PassengerServiceQueryRepository(prismaBooking as any, { includeServiceConfig: false });
 
 // Services
-const paymentService         = new PaymentService(paymentRepo, billingProfileRepo, invoiceRepo, prisma);
+const paymentService         = new PaymentService(paymentRepo, billingProfileRepo, invoiceRepo, prisma, prismaAuth as any);
 const invoiceService         = new InvoiceService(invoiceRepo);
 const invoiceItemService     = new InvoiceItemService(invoiceItemRepo);
 const passengerServiceService = new PassengerServiceService(passengerServiceRepo);
@@ -79,10 +82,12 @@ app.get(['/health', '/'], (_req, res) => {
   });
 });
 
-app.use('/api/v1/payments',          createPaymentRouter(paymentController, prisma));
-app.use('/api/v1/invoices',          createInvoiceRouter(invoiceController, prisma));
+const paymentOwnershipDb = { payments: prisma, booking: prismaBooking } as any;
+
+app.use('/api/v1/payments',          createPaymentRouter(paymentController, prisma, paymentOwnershipDb));
+app.use('/api/v1/invoices',          createInvoiceRouter(invoiceController, prisma, paymentOwnershipDb));
 app.use('/api/v1/invoice-items',     createInvoiceItemRouter(invoiceItemController, prisma));
-app.use('/api/v1/passenger-services', createPassengerServiceRouter(passengerServiceController, prisma));
+app.use('/api/v1/passenger-services', createPassengerServiceRouter(passengerServiceController, prismaBooking as any, prismaCatalog as any));
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Ruta ${req.originalUrl} no encontrada` } });
@@ -90,12 +95,12 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 async function start() {
-  await prisma.$connect();
+  await Promise.all([prisma.$connect(), prismaAuth.$connect(), prismaBooking.$connect(), prismaCatalog.$connect()]);
   app.listen(PORT, () => console.log(`🚀 [payments-service] → http://localhost:${PORT}`));
 }
 
-process.on('SIGINT',  async () => { await prisma.$disconnect(); process.exit(0); });
-process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGINT',  async () => { await Promise.allSettled([prisma.$disconnect(), prismaAuth.$disconnect(), prismaBooking.$disconnect(), prismaCatalog.$disconnect()]); process.exit(0); });
+process.on('SIGTERM', async () => { await Promise.allSettled([prisma.$disconnect(), prismaAuth.$disconnect(), prismaBooking.$disconnect(), prismaCatalog.$disconnect()]); process.exit(0); });
 process.on('uncaughtException',  (err) => { console.error('[payments-service] Excepción:', err); process.exit(1); });
 process.on('unhandledRejection', (r)   => { console.error('[payments-service] Promesa rechazada:', r); process.exit(1); });
 

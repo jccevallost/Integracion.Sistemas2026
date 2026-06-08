@@ -260,7 +260,6 @@ exports.Prisma.AirlineServiceConfigScalarFieldEnum = {
 exports.Prisma.ReservationScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  externalCartId: 'externalCartId',
   flightId: 'flightId',
   promotionId: 'promotionId',
   reservationCode: 'reservationCode',

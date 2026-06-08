@@ -64,12 +64,12 @@ async function lockServicePrice(db: PrismaClient, req: Request, res: Response, n
   } catch (err) { next(err); }
 }
 
-export function createPassengerServiceRouter(controller: PassengerServiceController, db: PrismaClient): Router {
+export function createPassengerServiceRouter(controller: PassengerServiceController, db: PrismaClient, catalogDb: PrismaClient = db): Router {
   const router = Router();
   router.get('/',                              authenticate, requireAdmin, controller.list);
   router.get('/by-passenger/:passengerId',     authenticate, (req, res, next) => ensurePassengerOwner(db, req, res, next), controller.listByPassenger);
   router.get('/:id',                           authenticate, (req, res, next) => ensurePassengerServiceOwner(db, req, res, next), controller.getById);
-  router.post('/',                             authenticate, validate(CreatePassengerServiceSchema), (req, res, next) => ensurePassengerOwner(db, req, res, next), (req, res, next) => lockServicePrice(db, req, res, next), controller.create);
+  router.post('/',                             authenticate, validate(CreatePassengerServiceSchema), (req, res, next) => ensurePassengerOwner(db, req, res, next), (req, res, next) => lockServicePrice(catalogDb, req, res, next), controller.create);
   router.put('/:id',                           authenticate, requireAdmin, validate(UpdatePassengerServiceSchema), controller.update);
   router.patch('/:id',                         authenticate, requireAdmin, validate(UpdatePassengerServiceSchema), controller.update);
   router.delete('/:id',                        authenticate, (req, res, next) => ensurePassengerServiceOwner(db, req, res, next), controller.remove);

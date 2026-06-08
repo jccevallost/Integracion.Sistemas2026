@@ -4,6 +4,7 @@ import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { requireInternalService } from '../shared/middlewares/internal.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
 import prisma from '../shared/database/prisma.auth.client.js';
+import prismaCatalog from '../shared/database/prisma.catalog.client.js';
 
 import { UserRepository }    from '../modules/api_users/repositories/UserRepository.js';
 import { AuthService }       from '../modules/api_users/services/AuthService.js';
@@ -14,7 +15,7 @@ const PORT = Number(process.env.AUTH_SERVICE_PORT) || 3001;
 
 validateJwtConfig();
 
-const userRepo       = new UserRepository(prisma);
+const userRepo       = new UserRepository(prisma, { includeRelations: false, cityDb: prismaCatalog as any });
 const authService    = new AuthService(userRepo);
 const authController = new AuthController(authService);
 
@@ -50,12 +51,12 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 async function start() {
-  await prisma.$connect();
+  await Promise.all([prisma.$connect(), prismaCatalog.$connect()]);
   app.listen(PORT, () => console.log(`🚀 [auth-service] → http://localhost:${PORT}`));
 }
 
-process.on('SIGINT',  async () => { await prisma.$disconnect(); process.exit(0); });
-process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0); });
+process.on('SIGINT',  async () => { await Promise.allSettled([prisma.$disconnect(), prismaCatalog.$disconnect()]); process.exit(0); });
+process.on('SIGTERM', async () => { await Promise.allSettled([prisma.$disconnect(), prismaCatalog.$disconnect()]); process.exit(0); });
 process.on('uncaughtException',  (err) => { console.error('[auth-service] Excepción:', err); process.exit(1); });
 process.on('unhandledRejection', (r)   => { console.error('[auth-service] Promesa rechazada:', r); process.exit(1); });
 

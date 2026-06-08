@@ -3,7 +3,7 @@ import { createServiceApp } from '../shared/app-factory.js';
 import { errorHandler } from '../shared/middlewares/error.middleware.js';
 import { validateJwtConfig } from '../shared/security/jwt.config.js';
 import prisma from '../shared/database/prisma.flights.client.js';
-import { startGrpcServer } from '../grpc/grpc.server.js';
+import { startFlightsGrpcServer } from '../grpc/flights.grpc.server.js';
 
 import { FlightRepository }      from '../modules/api_flights/repositories/FlightRepository.js';
 import { FlightClassRepository } from '../modules/api_flight_classes/repositories/FlightClassRepository.js';
@@ -93,7 +93,11 @@ app.use(errorHandler);
 
 async function start() {
   await prisma.$connect();
-  await startGrpcServer(GRPC_PORT);
+  await startFlightsGrpcServer(GRPC_PORT, {
+    flightService,
+    flightClassService,
+    promotionService,
+  });
   app.listen(PORT, () => {
     console.log(`🚀 [flights-service] REST → http://localhost:${PORT}`);
     console.log(`📡 [flights-service] gRPC → localhost:${GRPC_PORT}`);

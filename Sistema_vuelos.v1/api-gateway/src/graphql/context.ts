@@ -11,6 +11,7 @@ export interface ServiceUrls {
 export interface GraphQLContext {
   token?:   string;
   userId?:  string;
+  correlationId?: string;
   services: ServiceUrls;
   loaders:  Loaders;
 }
@@ -29,11 +30,13 @@ export function buildContext(request: Request, services: ServiceUrls): GraphQLCo
   const authHeader = request.headers.get('authorization');
   const token      = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   const userId     = token ? decodeUserId(token) : undefined;
+  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
 
   return {
     token,
     userId,
+    correlationId,
     services,
-    loaders: createLoaders(services.catalog, token),
+    loaders: createLoaders(services.catalog, token, correlationId),
   };
 }

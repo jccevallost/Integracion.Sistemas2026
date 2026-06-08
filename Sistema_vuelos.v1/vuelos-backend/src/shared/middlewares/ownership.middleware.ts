@@ -25,8 +25,37 @@ function normalizeId(value: unknown): string | undefined {
   return String(value);
 }
 
+function clientWithModel(db: any, model: string, aliases: string[]): any {
+  if (db?.[model]) return db;
+  for (const alias of aliases) {
+    if (db?.[alias]?.[model]) return db[alias];
+  }
+  return db;
+}
+
+function reservationClient(db: PrismaClient): PrismaClient {
+  return clientWithModel(db, 'reservation', ['booking', 'bookingDb', 'reservationDb']);
+}
+
+function paymentClient(db: PrismaClient): PrismaClient {
+  return clientWithModel(db, 'payment', ['payments', 'paymentsDb', 'paymentDb']);
+}
+
+function invoiceClient(db: PrismaClient): PrismaClient {
+  return clientWithModel(db, 'invoice', ['payments', 'paymentsDb', 'invoiceDb']);
+}
+
+function invoiceItemClient(db: PrismaClient): PrismaClient {
+  return clientWithModel(db, 'invoiceItem', ['payments', 'paymentsDb', 'invoiceItemDb']);
+}
+
+function billingProfileClient(db: PrismaClient): PrismaClient {
+  return clientWithModel(db, 'billingProfile', ['payments', 'paymentsDb', 'billingProfileDb']);
+}
+
 async function assertReservationOwner(db: PrismaClient, req: Request, res: Response, reservationId: string): Promise<boolean> {
-  const reservation = await db.reservation.findUnique({
+  const reservations = reservationClient(db);
+  const reservation = await reservations.reservation.findUnique({
     where: { id: reservationId },
     select: { id: true, userId: true, status: true, totalAmount: true },
   });
@@ -74,7 +103,8 @@ export function requireBillingProfileOwner(db: PrismaClient, getId: IdGetter) {
     try {
       const id = normalizeId(getId(req));
       if (!id) return missingId(res);
-      const profile = await db.billingProfile.findUnique({ where: { id }, select: { userId: true } });
+      const profiles = billingProfileClient(db);
+      const profile = await profiles.billingProfile.findUnique({ where: { id }, select: { userId: true } });
       if (!profile) return deny(res, 404, 'NOT_FOUND', 'Perfil de facturacion no encontrado');
       if (!isAdmin(req) && profile.userId !== userId(req)) {
         return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este perfil de facturacion');
@@ -89,13 +119,21 @@ export function requirePaymentOwner(db: PrismaClient, getId: IdGetter) {
     try {
       const id = normalizeId(getId(req));
       if (!id) return missingId(res);
-      const payment = await db.payment.findUnique({
+      const payments = paymentClient(db);
+      const reservations = reservationClient(db);
+      const payment = await payments.payment.findUnique({
         where: { id },
-        include: { reservation: { select: { userId: true } } },
+        select: { id: true, reservationId: true },
       });
       if (!payment) return deny(res, 404, 'NOT_FOUND', 'Pago no encontrado');
-      if (!isAdmin(req) && payment.reservation.userId !== userId(req)) {
-        return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este pago');
+      if (!isAdmin(req)) {
+        const reservation = await reservations.reservation.findUnique({
+          where: { id: payment.reservationId },
+          select: { userId: true },
+        });
+        if (!reservation || reservation.userId !== userId(req)) {
+          return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este pago');
+        }
       }
       next();
     } catch (err) { next(err); }
@@ -107,15 +145,24 @@ export function requireInvoiceOwner(db: PrismaClient, getId: IdGetter) {
     try {
       const id = normalizeId(getId(req));
       if (!id) return missingId(res);
-      const invoice = await db.invoice.findUnique({
+      const invoices = invoiceClient(db);
+      const reservations = reservationClient(db);
+      const invoice = await invoices.invoice.findUnique({
         where: { id },
         include: {
           billingProfile: { select: { userId: true } },
-          payment: { include: { reservation: { select: { userId: true } } } },
+          payment: { select: { reservationId: true } },
         },
       });
       if (!invoice) return deny(res, 404, 'NOT_FOUND', 'Factura no encontrada');
-      const ownerId = invoice.billingProfile?.userId ?? invoice.payment?.reservation?.userId;
+      let ownerId = invoice.billingProfile?.userId;
+      if (!ownerId && invoice.payment?.reservationId) {
+        const reservation = await reservations.reservation.findUnique({
+          where: { id: invoice.payment.reservationId },
+          select: { userId: true },
+        });
+        ownerId = reservation?.userId;
+      }
       if (!isAdmin(req) && ownerId !== userId(req)) {
         return deny(res, 403, 'FORBIDDEN', 'Sin permisos para esta factura');
       }
@@ -129,13 +176,21 @@ export function requirePaymentOwnerForInvoice(db: PrismaClient, getPaymentId: Id
     try {
       const paymentId = normalizeId(getPaymentId(req));
       if (!paymentId) return missingId(res);
-      const payment = await db.payment.findUnique({
+      const payments = paymentClient(db);
+      const reservations = reservationClient(db);
+      const payment = await payments.payment.findUnique({
         where: { id: paymentId },
-        include: { reservation: { select: { userId: true } } },
+        select: { id: true, reservationId: true },
       });
       if (!payment) return deny(res, 404, 'NOT_FOUND', 'Pago no encontrado');
-      if (!isAdmin(req) && payment.reservation.userId !== userId(req)) {
-        return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este pago');
+      if (!isAdmin(req)) {
+        const reservation = await reservations.reservation.findUnique({
+          where: { id: payment.reservationId },
+          select: { userId: true },
+        });
+        if (!reservation || reservation.userId !== userId(req)) {
+          return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este pago');
+        }
       }
       next();
     } catch (err) { next(err); }
@@ -147,7 +202,8 @@ export function requireInvoiceItemOwner(db: PrismaClient, getId: IdGetter) {
     try {
       const id = normalizeId(getId(req));
       if (!id) return missingId(res);
-      const item = await db.invoiceItem.findUnique({
+      const items = invoiceItemClient(db);
+      const item = await items.invoiceItem.findUnique({
         where: { id },
         include: { invoice: { include: { billingProfile: { select: { userId: true } } } } },
       });
@@ -165,7 +221,8 @@ export function requireInvoiceOwnerById(db: PrismaClient, getInvoiceId: IdGetter
     try {
       const invoiceId = normalizeId(getInvoiceId(req));
       if (!invoiceId) return missingId(res);
-      const invoice = await db.invoice.findUnique({
+      const invoices = invoiceClient(db);
+      const invoice = await invoices.invoice.findUnique({
         where: { id: invoiceId },
         include: { billingProfile: { select: { userId: true } } },
       });
@@ -232,7 +289,8 @@ export function prepareCustomerPayment(db: PrismaClient) {
     try {
       const reservationId = String((req.body as any).reservationId ?? '');
       if (!reservationId) return missingId(res);
-      const reservation = await db.reservation.findUnique({
+      const reservations = reservationClient(db);
+      const reservation = await reservations.reservation.findUnique({
         where: { id: reservationId },
         select: { userId: true, totalAmount: true, status: true },
       });

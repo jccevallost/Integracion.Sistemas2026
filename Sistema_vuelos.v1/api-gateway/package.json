@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node --import=./dist/telemetry/tracer.js dist/server.js"
+    "start": "node --import=./dist/telemetry/tracer.js dist/server.js",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@opentelemetry/auto-instrumentations-node": "^0.75.0",

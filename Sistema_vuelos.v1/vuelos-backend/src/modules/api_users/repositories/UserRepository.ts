@@ -6,20 +6,35 @@ import { PagedResult } from '../../../shared/interfaces/IBaseRepository.js';
 
 const include = { city: { include: { country: true } } };
 
+type UserRepositoryOptions = {
+  includeRelations?: boolean;
+  cityDb?: PrismaClient;
+};
+
 export class UserRepository implements IUserRepository {
-  constructor(private readonly db: PrismaClient) {}
+  private readonly includeRelations: boolean;
+  private readonly cityDb: PrismaClient;
+
+  constructor(private readonly db: PrismaClient, options: UserRepositoryOptions = {}) {
+    this.includeRelations = options.includeRelations ?? true;
+    this.cityDb = options.cityDb ?? db;
+  }
+
+  private relationInclude() {
+    return this.includeRelations ? include : undefined;
+  }
 
   async findAll(page = 1, limit = 100): Promise<PagedResult<User>> {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      this.db.user.findMany({ skip, take: limit, include, orderBy: { createdAt: 'desc' } }),
+      this.db.user.findMany({ skip, take: limit, include: this.relationInclude(), orderBy: { createdAt: 'desc' } }),
       this.db.user.count(),
     ]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) } as any;
   }
 
   async findById(id: string): Promise<User | null> {
-    return this.db.user.findUnique({ where: { id }, include }) as any;
+    return this.db.user.findUnique({ where: { id }, include: this.relationInclude() }) as any;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -27,7 +42,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findAllWithRelations(): Promise<any[]> {
-    return this.db.user.findMany({ include, orderBy: { createdAt: 'desc' } });
+    return this.db.user.findMany({ include: this.relationInclude(), orderBy: { createdAt: 'desc' } });
   }
 
   async create(data: any): Promise<User> {
@@ -42,7 +57,7 @@ export class UserRepository implements IUserRepository {
         ...rest,
         ...(birthDate && { birthDate: new Date(birthDate) }),
       },
-      include,
+      include: this.relationInclude(),
     }) as any;
   }
 
@@ -51,6 +66,6 @@ export class UserRepository implements IUserRepository {
   }
 
   async findFirstCity(): Promise<{ id: string } | null> {
-    return this.db.city.findFirst({ select: { id: true }, orderBy: { name: 'asc' } });
+    return this.cityDb.city.findFirst({ select: { id: true }, orderBy: { name: 'asc' } });
   }
 }

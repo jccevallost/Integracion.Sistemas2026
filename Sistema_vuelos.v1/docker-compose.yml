@@ -12,6 +12,14 @@ x-backend-env: &backend-env
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
   INTERNAL_API_KEY: ${INTERNAL_API_KEY}
   AUTH_SERVICE_URL: http://auth-service:3001
+  EVENT_BUS_DRIVER: rabbitmq
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+  RABBITMQ_EXCHANGE: vuelos.events
+  RABBITMQ_RETRY_EXCHANGE: vuelos.events.retry
+  RABBITMQ_DLQ_EXCHANGE: vuelos.events.dlq
+  RABBITMQ_RETRY_DELAY_MS: 5000
+  RABBITMQ_MAX_RETRIES: 3
+  EVENT_BUS_IDEMPOTENCY_WINDOW: 1000
 
 x-backend-build: &backend-build
   context: ./vuelos-backend
@@ -52,6 +60,8 @@ services:
       OTEL_SERVICE_NAME: api-gateway
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       jaeger:
         condition: service_started
       auth-service:
@@ -82,8 +92,12 @@ services:
       AUTH_SERVICE_PORT: 3001
       OTEL_SERVICE_NAME: auth-service
       AUTH_DATABASE_URL: ${AUTH_DATABASE_URL}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL}
       DATABASE_URL: ${AUTH_DATABASE_URL}
       AUTH_DATABASE_ACCESS: "direct"   # usa DB propia, no HTTP
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -101,6 +115,9 @@ services:
       OTEL_SERVICE_NAME: catalog-service
       CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL}
       DATABASE_URL: ${CATALOG_DATABASE_URL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -120,6 +137,9 @@ services:
       OTEL_SERVICE_NAME: flights-service
       FLIGHTS_DATABASE_URL: ${FLIGHTS_DATABASE_URL}
       DATABASE_URL: ${FLIGHTS_DATABASE_URL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -138,6 +158,9 @@ services:
       BOOKING_DATABASE_URL: ${BOOKING_DATABASE_URL}
       DATABASE_URL: ${BOOKING_DATABASE_URL}
       FLIGHTS_SERVICE_URL: http://flights-service:3003
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -154,7 +177,13 @@ services:
       PAYMENTS_SERVICE_PORT: 3005
       OTEL_SERVICE_NAME: payments-service
       PAYMENTS_DATABASE_URL: ${PAYMENTS_DATABASE_URL}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL}
+      BOOKING_DATABASE_URL: ${BOOKING_DATABASE_URL}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL}
       DATABASE_URL: ${PAYMENTS_DATABASE_URL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - vuelos-net
@@ -172,9 +201,28 @@ services:
       OTEL_SERVICE_NAME: admin-service
       ADMIN_DATABASE_URL: ${ADMIN_DATABASE_URL}
       AUTH_DATABASE_URL: ${AUTH_DATABASE_URL}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL}
       FLIGHTS_DATABASE_URL: ${FLIGHTS_DATABASE_URL}
       BOOKING_DATABASE_URL: ${BOOKING_DATABASE_URL}
+      PAYMENTS_DATABASE_URL: ${PAYMENTS_DATABASE_URL}
       DATABASE_URL: ${ADMIN_DATABASE_URL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vuelos-net
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - vuelos-net
