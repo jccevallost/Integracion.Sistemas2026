@@ -5,7 +5,7 @@ import { IPaymentService } from '../interfaces/IPaymentService.js';
 import { IPaymentRepository } from '../interfaces/IPaymentRepository.js';
 import { IBillingProfileRepository } from '../../api_billing_profiles/interfaces/IBillingProfileRepository.js';
 import { IInvoiceRepository } from '../../api_invoices/interfaces/IInvoiceRepository.js';
-import { NotFoundException } from '../../../shared/exceptions/BusinessException.js';
+import { ConflictException, NotFoundException } from '../../../shared/exceptions/BusinessException.js';
 
 export class PaymentService implements IPaymentService {
   constructor(
@@ -27,6 +27,21 @@ export class PaymentService implements IPaymentService {
   async findByReservation(reservationId: string) { return this.repo.findByReservation(reservationId); }
 
   async create(data: any, userId?: string) {
+    if (data.transactionId) {
+      const existing = await this.repo.findByTransaction(data.transactionId);
+      if (existing) {
+        if (data.reservationId && (existing as any).reservationId !== data.reservationId) {
+          throw new ConflictException('transactionId ya fue usado para otra reserva');
+        }
+        return existing;
+      }
+    }
+
+    if (data.reservationId) {
+      const existingByReservation = await this.repo.findByReservation(data.reservationId);
+      if (existingByReservation[0]) return existingByReservation[0];
+    }
+
     const payment = await this.repo.create({ ...data, status: data.status ?? 'COMPLETED' });
     if (userId) {
       this.autoGenerateInvoice(payment, userId).catch(err =>

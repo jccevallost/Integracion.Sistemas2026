@@ -97,6 +97,8 @@ Resiliencia del Event Bus:
 - Retry con TTL configurable.
 - DLQ cuando se supera `RABBITMQ_MAX_RETRIES`.
 - Idempotencia en memoria por `eventId`.
+- Pagos idempotentes por `transactionId` y `reservationId`: si el cliente
+  reintenta la misma operacion, el servicio devuelve el pago existente.
 - Fallback in-process si RabbitMQ no responde.
 
 Variables relevantes:
