@@ -290,6 +290,22 @@ class ApiClient {
         .toList();
   }
 
+  Future<void> updateProfile({
+    String? firstName,
+    String? firstLastName,
+    String? phone,
+    String? mainAddress,
+  }) async {
+    final body = <String, dynamic>{};
+    if (firstName    != null) body['firstName']    = firstName.trim();
+    if (firstLastName != null) body['firstLastName'] = firstLastName.trim();
+    if (phone        != null) body['phone']        = phone.trim();
+    if (mainAddress  != null) body['mainAddress']  = mainAddress.trim().isEmpty ? 'Sin direccion' : mainAddress.trim();
+    await _decode<dynamic>(
+      await http.patch(_uri('/users/me'), headers: _headers, body: jsonEncode(body)),
+    );
+  }
+
   Future<Payment> payReservation(Reservation reservation, String provider) async {
     final response = await http.post(
       _uri('/payments'),
@@ -405,19 +421,58 @@ class AuthSession {
     required this.token,
     required this.userName,
     required this.role,
+    this.id,
+    this.email,
+    this.firstName,
+    this.firstLastName,
+    this.phone,
+    this.mainAddress,
   });
 
   final String token;
   final String userName;
   final String role;
+  final String? id;
+  final String? email;
+  final String? firstName;
+  final String? firstLastName;
+  final String? phone;
+  final String? mainAddress;
+
+  AuthSession copyWith({
+    String? firstName,
+    String? firstLastName,
+    String? phone,
+    String? mainAddress,
+  }) {
+    final fn = firstName ?? this.firstName ?? '';
+    final fl = firstLastName ?? this.firstLastName ?? '';
+    return AuthSession(
+      token: token,
+      role: role,
+      id: id,
+      email: email,
+      userName: '${fn.trim()} ${fl.trim()}'.trim(),
+      firstName: firstName ?? this.firstName,
+      firstLastName: firstLastName ?? this.firstLastName,
+      phone: phone ?? this.phone,
+      mainAddress: mainAddress ?? this.mainAddress,
+    );
+  }
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
-    final user = json['user'] as Map<String, dynamic>? ?? {};
+    final user = json['user'] as Map<String, dynamic>? ?? json;
+    final tok  = json['token']?.toString() ?? '';
     return AuthSession(
-      token: json['token']?.toString() ?? '',
-      userName:
-          '${user['firstName'] ?? ''} ${user['firstLastName'] ?? ''}'.trim(),
+      token: tok,
+      userName: '${user['firstName'] ?? ''} ${user['firstLastName'] ?? ''}'.trim(),
       role: user['role']?.toString() ?? 'CUSTOMER',
+      id: user['id']?.toString(),
+      email: user['email']?.toString(),
+      firstName: user['firstName']?.toString(),
+      firstLastName: user['firstLastName']?.toString(),
+      phone: user['phone']?.toString(),
+      mainAddress: user['mainAddress']?.toString(),
     );
   }
 }
@@ -2166,38 +2221,37 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  final email        = TextEditingController();
-  final password     = TextEditingController();
-  final firstName    = TextEditingController();
-  final firstLastName = TextEditingController();
-  final phone        = TextEditingController();
-  final mainAddress  = TextEditingController();
-  bool loading    = false;
-  bool registering = false;
-  bool _obscure   = true;
+  // ── Login / Register controllers ──────────────────────────────────────────
+  final _email         = TextEditingController();
+  final _password      = TextEditingController();
+  final _firstName     = TextEditingController();
+  final _firstLastName = TextEditingController();
+  final _phone         = TextEditingController();
+  final _mainAddress   = TextEditingController();
+  bool _loading    = false;
+  bool _registering = false;
+  bool _obscure    = true;
+  bool _saving     = false;
 
   @override
   void dispose() {
-    email.dispose();
-    password.dispose();
-    firstName.dispose();
-    firstLastName.dispose();
-    phone.dispose();
-    mainAddress.dispose();
+    _email.dispose(); _password.dispose();
+    _firstName.dispose(); _firstLastName.dispose();
+    _phone.dispose(); _mainAddress.dispose();
     super.dispose();
   }
 
-  Future<void> login() async {
+  Future<void> _login() async {
     FocusScope.of(context).unfocus();
-    if (email.text.trim().isEmpty || password.text.isEmpty) {
+    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
       showMessage(context, 'Ingresa email y password');
       return;
     }
-    setState(() => loading = true);
+    setState(() => _loading = true);
     try {
-      final session = await widget.api.login(email.text, password.text);
+      final s = await widget.api.login(_email.text, _password.text);
       if (!mounted) return;
-      widget.onSessionChanged(session);
+      widget.onSessionChanged(s);
       showMessage(context, 'Sesion iniciada');
     } on ApiException catch (err) {
       if (!mounted) return;
@@ -2206,38 +2260,38 @@ class _AccountScreenState extends State<AccountScreen> {
       if (!mounted) return;
       showMessage(context, connectionErrorMessage(err));
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> register() async {
+  Future<void> _register() async {
     FocusScope.of(context).unfocus();
-    if (email.text.trim().isEmpty || password.text.isEmpty) {
+    if (_email.text.trim().isEmpty || _password.text.isEmpty) {
       showMessage(context, 'Ingresa email y password');
       return;
     }
-    if (password.text.length < 6) {
+    if (_password.text.length < 6) {
       showMessage(context, 'El password debe tener al menos 6 caracteres');
       return;
     }
-    if (firstName.text.trim().isEmpty || firstLastName.text.trim().isEmpty) {
+    if (_firstName.text.trim().isEmpty || _firstLastName.text.trim().isEmpty) {
       showMessage(context, 'Completa nombre y apellido');
       return;
     }
-    setState(() => loading = true);
+    setState(() => _loading = true);
     try {
-      final session = await widget.api.register(
+      final s = await widget.api.register(
         RegisterInput(
-          email: email.text,
-          password: password.text,
-          firstName: firstName.text,
-          firstLastName: firstLastName.text,
-          phone: phone.text,
-          mainAddress: mainAddress.text,
+          email: _email.text,
+          password: _password.text,
+          firstName: _firstName.text,
+          firstLastName: _firstLastName.text,
+          phone: _phone.text,
+          mainAddress: _mainAddress.text,
         ),
       );
       if (!mounted) return;
-      widget.onSessionChanged(session);
+      widget.onSessionChanged(s);
       showMessage(context, 'Cuenta creada');
     } on ApiException catch (err) {
       if (!mounted) return;
@@ -2246,13 +2300,104 @@ class _AccountScreenState extends State<AccountScreen> {
       if (!mounted) return;
       showMessage(context, connectionErrorMessage(err));
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // ── Profile editing ────────────────────────────────────────────────────────
+  Future<void> _editField({
+    required String label,
+    required String current,
+    required String fieldKey,
+    TextInputType keyboard = TextInputType.text,
+    TextCapitalization cap = TextCapitalization.words,
+    int? maxLength,
+  }) async {
+    final ctrl = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Editar $label',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: keyboard,
+          textCapitalization: cap,
+          maxLength: maxLength,
+          autofocus: true,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result == null || result == current || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      await widget.api.updateProfile(
+        firstName:     fieldKey == 'firstName'     ? result : null,
+        firstLastName: fieldKey == 'firstLastName' ? result : null,
+        phone:         fieldKey == 'phone'         ? result : null,
+        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
+      );
+      if (!mounted) return;
+      widget.onSessionChanged(widget.session!.copyWith(
+        firstName:     fieldKey == 'firstName'     ? result : null,
+        firstLastName: fieldKey == 'firstLastName' ? result : null,
+        phone:         fieldKey == 'phone'         ? result : null,
+        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
+      ));
+      showMessage(context, '$label actualizado');
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      // Si el endpoint no existe todavía, actualizamos solo localmente
+      if (err.message.contains('404') || err.message.toLowerCase().contains('not found')) {
+        widget.onSessionChanged(widget.session!.copyWith(
+          firstName:     fieldKey == 'firstName'     ? result : null,
+          firstLastName: fieldKey == 'firstLastName' ? result : null,
+          phone:         fieldKey == 'phone'         ? result : null,
+          mainAddress:   fieldKey == 'mainAddress'   ? result : null,
+        ));
+        showMessage(context, '$label actualizado (local)');
+      } else {
+        showMessage(context, err.message);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      // Actualizar localmente aunque falle la red
+      widget.onSessionChanged(widget.session!.copyWith(
+        firstName:     fieldKey == 'firstName'     ? result : null,
+        firstLastName: fieldKey == 'firstLastName' ? result : null,
+        phone:         fieldKey == 'phone'         ? result : null,
+        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
+      ));
+      showMessage(context, '$label actualizado (local)');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+
+    if (session == null) return _buildLoginView();
+    return _buildProfileView(session);
+  }
+
+  // ── Vista Login / Registro ─────────────────────────────────────────────────
+  Widget _buildLoginView() {
     return SafeArea(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -2275,33 +2420,22 @@ class _AccountScreenState extends State<AccountScreen> {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    session == null
-                        ? Icons.person_outline
-                        : Icons.verified_user_outlined,
-                    color: Colors.white,
-                    size: 22,
-                  ),
+                  child: const Icon(Icons.person_outline,
+                      color: Colors.white, size: 22),
                 ),
                 const SizedBox(width: 14),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Cuenta',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      session == null
-                          ? 'Accede para gestionar tus reservas'
-                          : 'Sesion activa',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
-                    ),
+                    const Text('Cuenta',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800)),
+                    Text('Accede para gestionar tus reservas',
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 13)),
                   ],
                 ),
               ],
@@ -2311,223 +2445,95 @@ class _AccountScreenState extends State<AccountScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (session == null) ...[
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(
-                          value: false,
-                          icon: Icon(Icons.login, size: 16),
-                          label: Text('Ingresar')),
-                      ButtonSegment(
-                          value: true,
-                          icon: Icon(Icons.person_add_outlined, size: 16),
-                          label: Text('Crear cuenta')),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, icon: Icon(Icons.login, size: 16), label: Text('Ingresar')),
+                    ButtonSegment(value: true, icon: Icon(Icons.person_add_outlined, size: 16), label: Text('Crear cuenta')),
+                  ],
+                  selected: {_registering},
+                  onSelectionChanged: _loading ? null : (v) => setState(() => _registering = v.first),
+                ),
+                const SizedBox(height: 16),
+                InfoBanner(
+                  icon: Icons.info_outline,
+                  text: _registering
+                      ? 'Crea una cuenta para reservar, consultar viajes y pagar desde el movil.'
+                      : 'Usa una cuenta existente. Si no tienes usuario, cambia a Crear cuenta.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Correo electronico',
+                    prefixIcon: Icon(Icons.email_outlined, size: 18),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _password,
+                  obscureText: _obscure,
+                  decoration: InputDecoration(
+                    labelText: 'Contrasena',
+                    prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                    ),
+                  ),
+                ),
+                if (_registering) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _firstName,
+                          decoration: const InputDecoration(
+                            labelText: 'Nombre',
+                            prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _firstLastName,
+                          decoration: const InputDecoration(labelText: 'Apellido'),
+                        ),
+                      ),
                     ],
-                    selected: {registering},
-                    onSelectionChanged: loading
-                        ? null
-                        : (v) => setState(() => registering = v.first),
                   ),
-                  const SizedBox(height: 16),
-                  InfoBanner(
-                    icon: Icons.info_outline,
-                    text: registering
-                        ? 'Crea una cuenta para reservar, consultar viajes y pagar desde el movil.'
-                        : 'Usa una cuenta existente. Si no tienes usuario, cambia a Crear cuenta.',
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    autocorrect: false,
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: 'Correo electronico',
-                      prefixIcon: Icon(Icons.email_outlined, size: 18),
+                      labelText: 'Telefono (opcional)',
+                      prefixIcon: Icon(Icons.phone_outlined, size: 18),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: password,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Contrasena',
-                      prefixIcon: const Icon(Icons.lock_outline, size: 18),
-                      suffixIcon: IconButton(
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (registering) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: firstName,
-                            decoration: const InputDecoration(
-                              labelText: 'Nombre',
-                              prefixIcon:
-                                  Icon(Icons.badge_outlined, size: 18),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: firstLastName,
-                            decoration: const InputDecoration(
-                              labelText: 'Apellido',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phone,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Telefono (opcional)',
-                        prefixIcon: Icon(Icons.phone_outlined, size: 18),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: mainAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Direccion (opcional)',
-                        prefixIcon:
-                            Icon(Icons.home_outlined, size: 18),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed:
-                          loading ? null : (registering ? register : login),
-                      icon: loading
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : Icon(registering
-                              ? Icons.person_add
-                              : Icons.login),
-                      label: Text(
-                          registering ? 'Crear cuenta' : 'Iniciar sesion'),
-                    ),
-                  ),
-                ] else ...[
-                  // Profile card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: const Border.fromBorderSide(
-                          BorderSide(color: Color(0xFFE2E8F0))),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: const Color(0xFFDBEAFE),
-                          child: Text(
-                            session.userName.isNotEmpty
-                                ? session.userName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              color: _kBlue,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                session.userName.isEmpty
-                                    ? 'Usuario autenticado'
-                                    : session.userName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDBEAFE),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  session.role,
-                                  style: const TextStyle(
-                                    color: _kBlue,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.verified,
-                            color: _kGreen, size: 20),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        widget.api.token = null;
-                        widget.onSessionChanged(null);
-                      },
-                      icon: const Icon(Icons.logout, size: 18),
-                      label: const Text('Cerrar sesion'),
+                    controller: _mainAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Direccion (opcional)',
+                      prefixIcon: Icon(Icons.home_outlined, size: 18),
                     ),
                   ),
                 ],
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: const Border.fromBorderSide(
-                        BorderSide(color: Color(0xFFE2E8F0))),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.dns_outlined,
-                          size: 14, color: Color(0xFF94A3B8)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          apiBaseUrl,
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF94A3B8)),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _loading ? null : (_registering ? _register : _login),
+                    icon: _loading
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Icon(_registering ? Icons.person_add : Icons.login),
+                    label: Text(_registering ? 'Crear cuenta' : 'Iniciar sesion'),
                   ),
                 ),
               ],
@@ -2536,6 +2542,251 @@ class _AccountScreenState extends State<AccountScreen> {
         ],
       ),
     );
+  }
+
+  // ── Vista Perfil ───────────────────────────────────────────────────────────
+  Widget _buildProfileView(AuthSession session) {
+    final initials = _initials(session);
+
+    return SafeArea(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // ── Hero del perfil ──────────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_kNavy, Color(0xFF1E3A8A), _kBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: Icon(Icons.person,
+                        size: 180,
+                        color: Colors.white.withValues(alpha: 0.04)),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 32, 0, 28),
+                  child: Column(
+                    children: [
+                      // Avatar grande
+                      CircleAvatar(
+                        radius: 46,
+                        backgroundColor: Colors.white.withValues(alpha: 0.18),
+                        child: CircleAvatar(
+                          radius: 42,
+                          backgroundColor: Colors.white.withValues(alpha: 0.25),
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        session.userName.isEmpty ? 'Usuario' : session.userName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (session.email != null && session.email!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          session.email!,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified, color: Colors.white, size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              session.role,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Información personal ─────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_saving)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(minHeight: 2, color: _kBlue),
+                  ),
+                _SectionHeader(label: 'Informacion personal'),
+                const SizedBox(height: 8),
+                _ProfileCard(
+                  children: [
+                    _ProfileField(
+                      icon: Icons.badge_outlined,
+                      label: 'Nombre',
+                      value: session.firstName?.isNotEmpty == true
+                          ? session.firstName!
+                          : 'Sin nombre',
+                      onEdit: () => _editField(
+                        label: 'Nombre',
+                        current: session.firstName ?? '',
+                        fieldKey: 'firstName',
+                      ),
+                    ),
+                    _FieldDivider(),
+                    _ProfileField(
+                      icon: Icons.badge_outlined,
+                      label: 'Apellido',
+                      value: session.firstLastName?.isNotEmpty == true
+                          ? session.firstLastName!
+                          : 'Sin apellido',
+                      onEdit: () => _editField(
+                        label: 'Apellido',
+                        current: session.firstLastName ?? '',
+                        fieldKey: 'firstLastName',
+                      ),
+                    ),
+                    _FieldDivider(),
+                    _ProfileField(
+                      icon: Icons.email_outlined,
+                      label: 'Correo electronico',
+                      value: session.email?.isNotEmpty == true
+                          ? session.email!
+                          : 'Sin correo',
+                      readOnly: true,
+                    ),
+                    _FieldDivider(),
+                    _ProfileField(
+                      icon: Icons.phone_outlined,
+                      label: 'Telefono',
+                      value: session.phone?.isNotEmpty == true
+                          ? session.phone!
+                          : 'Sin telefono',
+                      onEdit: () => _editField(
+                        label: 'Telefono',
+                        current: session.phone ?? '',
+                        fieldKey: 'phone',
+                        keyboard: TextInputType.phone,
+                        cap: TextCapitalization.none,
+                      ),
+                    ),
+                    _FieldDivider(),
+                    _ProfileField(
+                      icon: Icons.home_outlined,
+                      label: 'Direccion principal',
+                      value: (session.mainAddress?.isNotEmpty == true &&
+                              session.mainAddress != 'Sin direccion')
+                          ? session.mainAddress!
+                          : 'Sin direccion',
+                      onEdit: () => _editField(
+                        label: 'Direccion',
+                        current: session.mainAddress == 'Sin direccion'
+                            ? ''
+                            : (session.mainAddress ?? ''),
+                        fieldKey: 'mainAddress',
+                        cap: TextCapitalization.sentences,
+                        maxLength: 120,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                _SectionHeader(label: 'Sesion'),
+                const SizedBox(height: 8),
+                // Cerrar sesion
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: const Border.fromBorderSide(
+                        BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      widget.api.token = null;
+                      widget.onSessionChanged(null);
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _kRed.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.logout,
+                                color: _kRed, size: 18),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Text('Cerrar sesion',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: Color(0xFF1E293B))),
+                          ),
+                          Icon(Icons.chevron_right,
+                              color: Colors.grey.shade400),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _initials(AuthSession s) {
+    final parts = s.userName.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 }
 
@@ -4090,6 +4341,116 @@ class _SeatLegend extends StatelessWidget {
         Text(label,
             style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
       ],
+    );
+  }
+}
+
+// ─── Profile helper widgets ────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 2),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF64748B),
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: const Border.fromBorderSide(
+            BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _FieldDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, indent: 52, color: Color(0xFFF1F5F9));
+  }
+}
+
+class _ProfileField extends StatelessWidget {
+  const _ProfileField({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onEdit,
+    this.readOnly = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onEdit;
+  final bool readOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: readOnly ? null : onEdit,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 17, color: _kBlue),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 2),
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF1E293B),
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            if (readOnly)
+              const Icon(Icons.lock_outline, size: 16, color: Color(0xFFCBD5E1))
+            else
+              const Icon(Icons.edit_outlined, size: 17, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
     );
   }
 }
