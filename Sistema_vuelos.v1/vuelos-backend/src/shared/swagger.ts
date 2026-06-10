@@ -32,7 +32,7 @@ GET /flights/search?origin=UIO&destination=GYE&date=2026-06-15
 
 ### 3 — Validar código de promoción (opcional)
 \`\`\`
-GET /promotions/validate?code=VERANO20
+POST /promotions/validate
 → Retorna { isValid, discountType, discountValue, promotionId }
 \`\`\`
 
@@ -418,8 +418,12 @@ Sistema de microservicios con saga pattern. gRPC disponible en puerto 50051.`,
         CreateReservationRequest: {
           type: 'object', required: ['flightClassId', 'passengers'],
           properties: {
+            userId:         { type: 'string', format: 'uuid', description: 'Opcional solo para integracion server-to-server controlada' },
             flightClassId:  { type: 'string', format: 'uuid' },
             promotionCode:  { type: 'string', description: 'Código de promoción opcional' },
+            idCarrito:      { type: 'string', description: 'Referencia externa opcional del sistema de booking' },
+            metodoPagoId:   { type: 'string', description: 'Referencia externa opcional del metodo de pago en booking' },
+            currency:       { type: 'string', example: 'USD', description: 'Referencia externa opcional de moneda' },
             passengers: {
               type: 'array',
               minItems: 1,
@@ -622,7 +626,7 @@ Sistema de microservicios con saga pattern. gRPC disponible en puerto 50051.`,
     tags: [
       {
         name: '🔗 BOOKING — Flujo de integración',
-        description: `Endpoints **públicos** que el booking-service debe consumir en orden.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com/api/v1\`\n\n| # | Método | Ruta | Auth | Descripción |\n|---|--------|------|------|-------------|\n| 1 | POST | \`/auth/login\` | Pública | Obtener JWT |\n| 2 | GET | \`/flights/search\` | Pública | Buscar vuelos disponibles |\n| 3 | GET | \`/promotions/validate?code=\` | Pública | Validar código de descuento |\n| 4 | POST | \`/reservations\` | Bearer JWT | Crear reserva (saga atómico) |\n| 5 | GET | \`/reservations/:id\` | Bearer JWT | Consultar reserva |\n| 6 | DELETE | \`/reservations/:id\` | Bearer JWT | Cancelar reserva |`,
+        description: `Endpoints **públicos** que el booking-service debe consumir en orden.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com/api/v1\`\n\n| # | Método | Ruta | Auth | Descripción |\n|---|--------|------|------|-------------|\n| 1 | POST | \`/auth/login\` | Pública | Obtener JWT |\n| 2 | GET | \`/flights/search\` | Pública | Buscar vuelos disponibles |\n| 3 | POST | \`/promotions/validate\` | Pública | Validar código de descuento |\n| 4 | POST | \`/reservations\` | Bearer JWT | Crear reserva (saga atómico) |\n| 5 | GET | \`/reservations/:id\` | Bearer JWT | Consultar reserva |\n| 6 | DELETE | \`/reservations/:id\` | Bearer JWT | Cancelar reserva |\n| 7 | POST | \`/payments\` | Bearer JWT | Registrar pago idempotente |`,
       },
       {
         name: '🔐 BOOKING — Endpoints internos',

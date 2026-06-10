@@ -118,6 +118,9 @@ EVENT_BUS_IDEMPOTENCY_WINDOW=1000
 
 La app `vuelos-mobile` cumple el entregable de frontend movil marketplace.
 
+El contrato publico para integrar Booking v2 queda documentado en
+`docs/contrato-api-booking-v2.md`.
+
 Funciones implementadas:
 
 - Busqueda de vuelos por origen, destino, fecha, pasajeros y clase.
