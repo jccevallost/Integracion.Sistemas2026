@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 const apiBaseUrl = String.fromEnvironment(
@@ -509,16 +511,19 @@ class PassengerInput {
     required this.firstName,
     required this.lastName,
     required this.documentNumber,
+    this.seatNumber,
   });
 
   final String firstName;
   final String lastName;
   final String documentNumber;
+  final String? seatNumber;
 
   Map<String, dynamic> toJson() => {
     'firstName': firstName.trim(),
     'lastName': lastName.trim(),
     'documentNumber': documentNumber.trim(),
+    if (seatNumber != null) 'seatNumber': seatNumber,
   };
 }
 
@@ -727,6 +732,14 @@ class _ShellScreenState extends State<ShellScreen> {
   final api = ApiClient();
   AuthSession? session;
   int index = 0;
+  int _refreshTrigger = 0;
+
+  void _onReservationCreated() {
+    setState(() {
+      _refreshTrigger++;
+      index = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -734,8 +747,12 @@ class _ShellScreenState extends State<ShellScreen> {
       body: IndexedStack(
         index: index,
         children: [
-          SearchScreen(api: api),
-          TripsScreen(api: api, isLoggedIn: session != null),
+          SearchScreen(api: api, onReservationCreated: _onReservationCreated),
+          TripsScreen(
+            api: api,
+            isLoggedIn: session != null,
+            refreshTrigger: _refreshTrigger,
+          ),
           AccountScreen(
             api: api,
             session: session,
@@ -775,9 +792,14 @@ class _ShellScreenState extends State<ShellScreen> {
 
 // ─── SearchScreen ─────────────────────────────────────────────────────────────
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, required this.api});
+  const SearchScreen({
+    super.key,
+    required this.api,
+    required this.onReservationCreated,
+  });
 
   final ApiClient api;
+  final VoidCallback onReservationCreated;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -1054,8 +1076,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     16, 0, 16, i == flights.length - 1 ? 24 : 0),
                 child: FlightTile(
                   flight: flights[i],
-                  onReserve: (fc) =>
-                      showReservationSheet(context, widget.api, fc),
+                  onReserve: (fc) => showReservationSheet(
+                    context,
+                    widget.api,
+                    fc,
+                    onCreated: widget.onReservationCreated,
+                  ),
                 ),
               ),
             ),
@@ -1872,10 +1898,16 @@ class _InfoChip extends StatelessWidget {
 
 // ─── Trips Screen ─────────────────────────────────────────────────────────────
 class TripsScreen extends StatefulWidget {
-  const TripsScreen({super.key, required this.api, required this.isLoggedIn});
+  const TripsScreen({
+    super.key,
+    required this.api,
+    required this.isLoggedIn,
+    required this.refreshTrigger,
+  });
 
   final ApiClient api;
   final bool isLoggedIn;
+  final int refreshTrigger;
 
   @override
   State<TripsScreen> createState() => _TripsScreenState();
@@ -1919,6 +1951,9 @@ class _TripsScreenState extends State<TripsScreen> {
   void didUpdateWidget(covariant TripsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isLoggedIn && !oldWidget.isLoggedIn) load();
+    if (widget.refreshTrigger != oldWidget.refreshTrigger && widget.isLoggedIn) {
+      load();
+    }
   }
 
   @override
@@ -2707,13 +2742,15 @@ class _SheetHandle extends StatelessWidget {
 Future<void> showReservationSheet(
   BuildContext context,
   ApiClient api,
-  FlightClass flightClass,
-) async {
+  FlightClass flightClass, {
+  VoidCallback? onCreated,
+}) async {
   final firstName = TextEditingController();
   final lastName  = TextEditingController();
   final document  = TextEditingController();
   final promotion = TextEditingController();
   bool loading = false;
+  String? selectedSeat;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -2721,11 +2758,20 @@ Future<void> showReservationSheet(
     builder: (sheetContext) {
       return StatefulBuilder(
         builder: (context, setState) {
+          Future<void> pickSeat() async {
+            final seat = await showSeatMap(context, flightClass);
+            if (seat != null) setState(() => selectedSeat = seat);
+          }
+
           Future<void> submit() async {
             if (firstName.text.trim().isEmpty ||
                 lastName.text.trim().isEmpty ||
                 document.text.trim().isEmpty) {
               showMessage(context, 'Completa los datos del pasajero');
+              return;
+            }
+            if (selectedSeat == null) {
+              showMessage(context, 'Selecciona un asiento antes de confirmar');
               return;
             }
             setState(() => loading = true);
@@ -2736,12 +2782,14 @@ Future<void> showReservationSheet(
                   firstName: firstName.text,
                   lastName: lastName.text,
                   documentNumber: document.text,
+                  seatNumber: selectedSeat,
                 ),
                 promotionCode: promotion.text,
               );
               if (!context.mounted || !sheetContext.mounted) return;
               Navigator.pop(sheetContext);
-              showMessage(context, 'Reserva ${reservation.code} creada');
+              showMessage(context, 'Reserva ${reservation.code} creada · Asiento $selectedSeat');
+              onCreated?.call();
             } on ApiException catch (err) {
               if (!context.mounted) return;
               showMessage(context, err.message);
@@ -2781,15 +2829,11 @@ Future<void> showReservationSheet(
                         children: [
                           const Text(
                             'Nueva Reserva',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
                           ),
                           Text(
                             '${_cabinLabel(flightClass.cabinClass)} · \$${flightClass.basePrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                                color: Color(0xFF64748B), fontSize: 13),
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                           ),
                         ],
                       ),
@@ -2797,19 +2841,14 @@ Future<void> showReservationSheet(
                     IconButton(
                       onPressed: () => Navigator.pop(sheetContext),
                       icon: const Icon(Icons.close),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                      ),
+                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
                 const Text(
                   'Datos del pasajero',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: Color(0xFF64748B)),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -2827,9 +2866,7 @@ Future<void> showReservationSheet(
                     Expanded(
                       child: TextField(
                         controller: lastName,
-                        decoration: const InputDecoration(
-                          labelText: 'Apellido',
-                        ),
+                        decoration: const InputDecoration(labelText: 'Apellido'),
                       ),
                     ),
                   ],
@@ -2851,7 +2888,54 @@ Future<void> showReservationSheet(
                     prefixIcon: Icon(Icons.local_offer_outlined, size: 18),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                // ── Selector de asiento ──────────────────────────────────────
+                GestureDetector(
+                  onTap: loading ? null : pickSeat,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: selectedSeat != null
+                          ? _kGreen.withValues(alpha: 0.08)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selectedSeat != null
+                            ? _kGreen.withValues(alpha: 0.5)
+                            : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedSeat != null
+                              ? Icons.event_seat
+                              : Icons.event_seat_outlined,
+                          color: selectedSeat != null ? _kGreen : const Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            selectedSeat != null
+                                ? 'Asiento seleccionado: $selectedSeat'
+                                : 'Seleccionar asiento (obligatorio)',
+                            style: TextStyle(
+                              color: selectedSeat != null ? _kGreen : const Color(0xFF64748B),
+                              fontWeight: selectedSeat != null ? FontWeight.w700 : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: selectedSeat != null ? _kGreen : Colors.grey.shade400,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -2862,16 +2946,10 @@ Future<void> showReservationSheet(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Total a pagar',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B))),
+                          style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                       Text(
                         '\$${flightClass.basePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _kBlue,
-                        ),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _kBlue),
                       ),
                     ],
                   ),
@@ -2882,13 +2960,10 @@ Future<void> showReservationSheet(
                   icon: loading
                       ? const SizedBox.square(
                           dimension: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.check_circle_outline),
-                  label: Text(loading
-                      ? 'Procesando...'
-                      : 'Confirmar reserva'),
+                  label: Text(loading ? 'Procesando...' : 'Confirmar reserva'),
                 ),
               ],
             ),
@@ -2911,6 +2986,14 @@ Future<void> showReservationDetailSheet(
   late Future<ReservationDetail> detailFuture =
       api.reservationDetail(reservation.id);
 
+  // Campos de tarjeta de crédito
+  final cardNumber = TextEditingController();
+  final cardExpiry  = TextEditingController();
+  final cardCvv     = TextEditingController();
+  final cardHolder  = TextEditingController();
+  final paypalEmail  = TextEditingController();
+  final transferRef  = TextEditingController();
+
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -2918,6 +3001,31 @@ Future<void> showReservationDetailSheet(
       return StatefulBuilder(
         builder: (context, setState) {
           Future<void> pay() async {
+            // Validar campos según método
+            if (provider == 'VISA' || provider == 'MASTERCARD') {
+              final raw = cardNumber.text.replaceAll(' ', '');
+              if (raw.length < 16) {
+                showMessage(context, 'Numero de tarjeta invalido (16 digitos)');
+                return;
+              }
+              if (cardExpiry.text.length < 5) {
+                showMessage(context, 'Fecha de vencimiento invalida (MM/AA)');
+                return;
+              }
+              if (cardCvv.text.length < 3) {
+                showMessage(context, 'CVV invalido');
+                return;
+              }
+              if (cardHolder.text.trim().isEmpty) {
+                showMessage(context, 'Ingresa el nombre del titular');
+                return;
+              }
+            } else if (provider == 'PAYPAL') {
+              if (!paypalEmail.text.contains('@')) {
+                showMessage(context, 'Ingresa un email de PayPal valido');
+                return;
+              }
+            }
             setState(() => paying = true);
             try {
               await api.payReservation(reservation, provider);
@@ -3265,33 +3373,53 @@ Future<void> showReservationDetailSheet(
                                       size: 18),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(
-                                      value: 'VISA',
-                                      child: Text('Visa')),
-                                  DropdownMenuItem(
-                                      value: 'MASTERCARD',
-                                      child: Text('Mastercard')),
-                                  DropdownMenuItem(
-                                      value: 'PAYPAL',
-                                      child: Text('PayPal')),
-                                  DropdownMenuItem(
-                                      value: 'TRANSFER',
-                                      child: Text('Transferencia')),
+                                  DropdownMenuItem(value: 'VISA',       child: Text('💳  Visa')),
+                                  DropdownMenuItem(value: 'MASTERCARD', child: Text('💳  Mastercard')),
+                                  DropdownMenuItem(value: 'PAYPAL',     child: Text('🅿️  PayPal')),
+                                  DropdownMenuItem(value: 'TRANSFER',   child: Text('🏦  Transferencia')),
                                 ],
-                                onChanged: paying
-                                    ? null
-                                    : (v) => setState(
-                                        () => provider = v!),
+                                onChanged: paying ? null : (v) => setState(() => provider = v!),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
+                              // ── Formulario según método ──────────────────
+                              if (provider == 'VISA' || provider == 'MASTERCARD')
+                                _CardForm(
+                                  brand: provider,
+                                  cardNumber: cardNumber,
+                                  expiry: cardExpiry,
+                                  cvv: cardCvv,
+                                  holder: cardHolder,
+                                  enabled: !paying,
+                                )
+                              else if (provider == 'PAYPAL') ...[
+                                TextField(
+                                  controller: paypalEmail,
+                                  enabled: !paying,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email de PayPal',
+                                    prefixIcon: Icon(Icons.email_outlined, size: 18),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ] else ...[
+                                TextField(
+                                  controller: transferRef,
+                                  enabled: !paying,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Referencia de transferencia',
+                                    prefixIcon: Icon(Icons.tag_outlined, size: 18),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              const SizedBox(height: 4),
                               FilledButton.icon(
                                 onPressed: paying ? null : pay,
                                 icon: paying
                                     ? const SizedBox.square(
                                         dimension: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white),
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                       )
                                     : const Icon(Icons.lock_outline),
                                 label: Text(paying
@@ -3391,4 +3519,577 @@ String formatDateTime(String value) {
   final h   = parsed.hour.toString().padLeft(2, '0');
   final min = parsed.minute.toString().padLeft(2, '0');
   return '$y-$mo-$d $h:$min';
+}
+
+// ─── Credit Card Form ─────────────────────────────────────────────────────────
+class _CardForm extends StatefulWidget {
+  const _CardForm({
+    required this.brand,
+    required this.cardNumber,
+    required this.expiry,
+    required this.cvv,
+    required this.holder,
+    required this.enabled,
+  });
+
+  final String brand;
+  final TextEditingController cardNumber;
+  final TextEditingController expiry;
+  final TextEditingController cvv;
+  final TextEditingController holder;
+  final bool enabled;
+
+  @override
+  State<_CardForm> createState() => _CardFormState();
+}
+
+class _CardFormState extends State<_CardForm> {
+  bool _obscureCvv = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final isVisa = widget.brand == 'VISA';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isVisa
+              ? [const Color(0xFF1A3A6B), const Color(0xFF1D4ED8)]
+              : [const Color(0xFF4A1942), const Color(0xFFEB5757)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: (isVisa ? _kBlue : const Color(0xFFEB5757)).withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Text(
+                isVisa ? 'VISA' : 'MASTERCARD',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: 2,
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.contactless, color: Colors.white.withValues(alpha: 0.7), size: 22),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Chip simulado
+          Container(
+            width: 36,
+            height: 26,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4AC0D),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFB7950B)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Número de tarjeta
+          TextField(
+            controller: widget.cardNumber,
+            enabled: widget.enabled,
+            keyboardType: TextInputType.number,
+            maxLength: 19,
+            inputFormatters: [_CardNumberFormatter()],
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 3,
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              labelText: 'Numero de tarjeta',
+              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+              hintText: '0000 0000 0000 0000',
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), letterSpacing: 3),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white, width: 2),
+              ),
+              filled: false,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Vencimiento
+              Expanded(
+                child: TextField(
+                  controller: widget.expiry,
+                  enabled: widget.enabled,
+                  keyboardType: TextInputType.number,
+                  maxLength: 5,
+                  inputFormatters: [_ExpiryFormatter()],
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    labelText: 'Vencimiento',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                    hintText: 'MM/AA',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white, width: 2),
+                    ),
+                    filled: false,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              // CVV
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: widget.cvv,
+                  enabled: widget.enabled,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  obscureText: _obscureCvv,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    labelText: 'CVV',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                    hintText: '•••',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                    suffixIcon: GestureDetector(
+                      onTap: () => setState(() => _obscureCvv = !_obscureCvv),
+                      child: Icon(
+                        _obscureCvv ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: Colors.white.withValues(alpha: 0.6),
+                        size: 16,
+                      ),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: const UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white, width: 2),
+                    ),
+                    filled: false,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Titular
+          TextField(
+            controller: widget.holder,
+            enabled: widget.enabled,
+            textCapitalization: TextCapitalization.characters,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 1),
+            decoration: InputDecoration(
+              labelText: 'Nombre del titular',
+              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+              hintText: 'TAL COMO APARECE EN LA TARJETA',
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white, width: 2),
+              ),
+              filled: false,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+}
+
+// Formateador número de tarjeta: XXXX XXXX XXXX XXXX
+class _CardNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+    final digits = next.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < digits.length && i < 16; i++) {
+      if (i > 0 && i % 4 == 0) buffer.write(' ');
+      buffer.write(digits[i]);
+    }
+    final str = buffer.toString();
+    return TextEditingValue(
+      text: str,
+      selection: TextSelection.collapsed(offset: str.length),
+    );
+  }
+}
+
+// Formateador vencimiento: MM/AA
+class _ExpiryFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+    final digits = next.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length <= 2) return next.copyWith(text: digits);
+    final str = '${digits.substring(0, 2)}/${digits.substring(2, digits.length.clamp(0, 4))}';
+    return TextEditingValue(
+      text: str,
+      selection: TextSelection.collapsed(offset: str.length),
+    );
+  }
+}
+
+// ─── Seat Map ─────────────────────────────────────────────────────────────────
+Future<String?> showSeatMap(BuildContext context, FlightClass flightClass) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _SeatMapSheet(flightClass: flightClass),
+  );
+}
+
+class _SeatMapSheet extends StatefulWidget {
+  const _SeatMapSheet({required this.flightClass});
+  final FlightClass flightClass;
+
+  @override
+  State<_SeatMapSheet> createState() => _SeatMapSheetState();
+}
+
+class _SeatMapSheetState extends State<_SeatMapSheet> {
+  String? _selected;
+  late final Set<String> _taken;
+  late final List<String> _cols;
+  late final int _rows;
+
+  @override
+  void initState() {
+    super.initState();
+    final cabin = widget.flightClass.cabinClass.toUpperCase();
+    if (cabin == 'FIRST') {
+      _rows = 4; _cols = ['A', 'B'];
+    } else if (cabin == 'BUSINESS') {
+      _rows = 8; _cols = ['A', 'B', 'C', 'D'];
+    } else {
+      _rows = 30; _cols = ['A', 'B', 'C', 'D', 'E', 'F'];
+    }
+    final totalSeats = _rows * _cols.length;
+    _taken = _computeTakenSeats(
+      seed: widget.flightClass.id.hashCode.abs(),
+      total: totalSeats,
+      available: widget.flightClass.availableSeats.clamp(0, totalSeats),
+      rows: _rows,
+      cols: _cols,
+    );
+  }
+
+  static Set<String> _computeTakenSeats({
+    required int seed,
+    required int total,
+    required int available,
+    required int rows,
+    required List<String> cols,
+  }) {
+    final takenCount = (total - available).clamp(0, total);
+    if (takenCount == 0) return {};
+    final all = <String>[
+      for (int r = 1; r <= rows; r++)
+        for (final c in cols) '$r$c',
+    ];
+    all.shuffle(math.Random(seed));
+    return all.take(takenCount).toSet();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cabin = widget.flightClass.cabinClass.toUpperCase();
+    final isWide = cabin == 'FIRST' || cabin == 'BUSINESS';
+    // Determinar índice del pasillo (entre col B-C en economy, A-B en business/first)
+    final aisleAfter = isWide ? 1 : 2; // índice (0-based) después del cual va el pasillo
+
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.88,
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Column(
+              children: [
+                const _SheetHandle(),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.event_seat, color: _kBlue, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Plano de cabina',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                          Text(
+                            '${_cabinLabel(widget.flightClass.cabinClass)} · ${widget.flightClass.availableSeats} disponibles',
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Leyenda
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _SeatLegend(color: const Color(0xFFE2E8F0), label: 'Disponible'),
+                    const SizedBox(width: 16),
+                    _SeatLegend(color: _kRed.withValues(alpha: 0.8), label: 'Ocupado'),
+                    const SizedBox(width: 16),
+                    _SeatLegend(color: _kBlue, label: 'Seleccionado'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+          // Cabecera columnas
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _SeatRowHeader(cols: _cols, aisleAfter: aisleAfter),
+          ),
+          // Grid de asientos
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              itemCount: _rows,
+              itemBuilder: (context, i) {
+                final row = i + 1;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      // Número de fila
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '$row',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // Asientos
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (int ci = 0; ci < _cols.length; ci++) ...[
+                              if (ci == aisleAfter + 1) const SizedBox(width: 20),
+                              _SeatButton(
+                                label: '$row${_cols[ci]}',
+                                isTaken: _taken.contains('$row${_cols[ci]}'),
+                                isSelected: _selected == '$row${_cols[ci]}',
+                                onTap: () => setState(() => _selected = '$row${_cols[ci]}'),
+                              ),
+                              if (ci < _cols.length - 1 && ci != aisleAfter) const SizedBox(width: 6),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          // Botón confirmar
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 16),
+            child: Column(
+              children: [
+                if (_selected != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: _kBlue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _kBlue.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Asiento seleccionado: $_selected',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: _kBlue, fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _selected == null
+                        ? null
+                        : () => Navigator.pop(context, _selected),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(_selected == null
+                        ? 'Selecciona un asiento'
+                        : 'Confirmar asiento $_selected'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SeatButton extends StatelessWidget {
+  const _SeatButton({
+    required this.label,
+    required this.isTaken,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isTaken;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final Color fg;
+    if (isTaken) {
+      bg = _kRed.withValues(alpha: 0.15);
+      fg = _kRed;
+    } else if (isSelected) {
+      bg = _kBlue;
+      fg = Colors.white;
+    } else {
+      bg = const Color(0xFFE2E8F0);
+      fg = const Color(0xFF475569);
+    }
+
+    return GestureDetector(
+      onTap: isTaken ? null : onTap,
+      child: Container(
+        width: 34,
+        height: 30,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isTaken
+                ? _kRed.withValues(alpha: 0.4)
+                : isSelected
+                    ? _kBlue
+                    : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Center(
+          child: isTaken
+              ? Icon(Icons.close, size: 12, color: fg)
+              : Text(
+                  label.replaceAll(RegExp(r'[0-9]'), ''),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SeatRowHeader extends StatelessWidget {
+  const _SeatRowHeader({required this.cols, required this.aisleAfter});
+  final List<String> cols;
+  final int aisleAfter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(width: 32),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (int ci = 0; ci < cols.length; ci++) ...[
+                if (ci == aisleAfter + 1) const SizedBox(width: 20),
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    cols[ci],
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B)),
+                  ),
+                ),
+                if (ci < cols.length - 1 && ci != aisleAfter) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SeatLegend extends StatelessWidget {
+  const _SeatLegend({required this.color, required this.label});
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+      ],
+    );
+  }
 }
