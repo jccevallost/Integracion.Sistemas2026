@@ -473,7 +473,49 @@ GET /payments/by-reservation/{reservationId}
 Authorization: Bearer <jwt>
 ```
 
-## 9. Flujo recomendado para Booking
+## 9. Perfil de usuario
+
+Consultar perfil del usuario autenticado:
+
+```http
+GET /auth/me
+Authorization: Bearer <jwt>
+```
+
+Actualizar datos del perfil:
+
+```http
+PUT /auth/profile
+Authorization: Bearer <jwt>
+```
+
+Request (todos los campos son opcionales):
+
+```json
+{
+  "firstName": "Ana",
+  "firstLastName": "Lopez",
+  "phone": "0999999999",
+  "mainAddress": "Av. Principal 123"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-user",
+    "email": "cliente@example.com",
+    "firstName": "Ana",
+    "firstLastName": "Lopez",
+    "role": "CUSTOMER"
+  }
+}
+```
+
+## 10. Flujo recomendado para Booking (resumen)
 
 1. Autenticar o registrar usuario y guardar `token`.
 2. Buscar vuelos con `/flights/search`.
@@ -484,7 +526,7 @@ Authorization: Bearer <jwt>
 7. Consultar detalle con `/reservations/{reservationId}`.
 8. Consultar pagos con `/payments/by-reservation/{reservationId}`.
 
-## 10. Reglas de integracion
+## 11. Reglas de integracion
 
 - No calcular precio final en Booking como fuente de verdad.
 - No descontar asientos en Booking; lo hace el backend.

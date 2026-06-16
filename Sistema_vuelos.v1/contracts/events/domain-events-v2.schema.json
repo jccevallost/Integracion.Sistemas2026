@@ -40,7 +40,8 @@
       "type": "string",
       "enum": [
         "booking-service",
-        "payments-service"
+        "payments-service",
+        "admin-service"
       ]
     },
     "correlationId": {
@@ -50,62 +51,78 @@
       "oneOf": [
         { "$ref": "#/$defs/reservationCreatedPayload" },
         { "$ref": "#/$defs/reservationCancelledPayload" },
+        { "$ref": "#/$defs/seatAssignedPayload" },
+        { "$ref": "#/$defs/checkInCompletedPayload" },
         { "$ref": "#/$defs/paymentRegisteredPayload" },
         { "$ref": "#/$defs/invoiceIssuedPayload" },
-        { "$ref": "#/$defs/ancillaryAddedPayload" },
-        { "type": "object" }
+        { "$ref": "#/$defs/ancillaryAddedPayload" }
       ]
     }
   },
   "$defs": {
     "reservationCreatedPayload": {
       "type": "object",
-      "required": ["id", "reservationCode", "totalAmount", "status"],
+      "required": ["reservationId", "userId"],
       "properties": {
-        "id": { "type": "string", "format": "uuid" },
+        "reservationId": { "type": "string", "format": "uuid" },
         "reservationCode": { "type": "string" },
         "userId": { "type": "string", "format": "uuid" },
-        "totalAmount": { "type": "number" },
-        "status": { "type": "string" }
+        "totalAmount": { "type": "number" }
       }
     },
     "reservationCancelledPayload": {
       "type": "object",
-      "required": ["cancelled"],
+      "required": ["reservationId"],
       "properties": {
-        "cancelled": { "type": "boolean" },
-        "reservationCode": { "type": "string" },
+        "reservationId": { "type": "string", "format": "uuid" },
         "reason": { "type": "string" }
+      }
+    },
+    "seatAssignedPayload": {
+      "type": "object",
+      "required": ["passengerId", "seatNumber"],
+      "properties": {
+        "passengerId": { "type": "string", "format": "uuid" },
+        "reservationId": { "type": "string", "format": "uuid" },
+        "seatNumber": { "type": "string", "example": "14C" }
+      }
+    },
+    "checkInCompletedPayload": {
+      "type": "object",
+      "required": ["boardingPassId", "passengerId"],
+      "properties": {
+        "boardingPassId": { "type": "string", "format": "uuid" },
+        "passengerId": { "type": "string", "format": "uuid" },
+        "reservationId": { "type": "string", "format": "uuid" },
+        "boardingCode": { "type": "string" }
       }
     },
     "paymentRegisteredPayload": {
       "type": "object",
-      "required": ["id", "reservationId", "amount", "status"],
+      "required": ["paymentId", "reservationId"],
       "properties": {
-        "id": { "type": "string", "format": "uuid" },
+        "paymentId": { "type": "string", "format": "uuid" },
         "reservationId": { "type": "string", "format": "uuid" },
         "amount": { "type": "number" },
-        "status": { "type": "string" },
-        "transactionId": { "type": "string" }
+        "status": { "type": "string" }
       }
     },
     "invoiceIssuedPayload": {
       "type": "object",
-      "required": ["id"],
+      "required": ["invoiceId"],
       "properties": {
-        "id": { "type": "string", "format": "uuid" },
+        "invoiceId": { "type": "string", "format": "uuid" },
         "paymentId": { "type": "string", "format": "uuid" },
-        "total": { "type": "number" }
+        "totalAmount": { "type": "number" }
       }
     },
     "ancillaryAddedPayload": {
       "type": "object",
-      "required": ["id", "passengerId"],
+      "required": ["passengerServiceId"],
       "properties": {
-        "id": { "type": "string", "format": "uuid" },
+        "passengerServiceId": { "type": "string", "format": "uuid" },
         "passengerId": { "type": "string", "format": "uuid" },
-        "serviceConfigId": { "type": "string", "format": "uuid" },
-        "quantity": { "type": "integer" }
+        "amount": { "type": "number" }
       }
     }
   }

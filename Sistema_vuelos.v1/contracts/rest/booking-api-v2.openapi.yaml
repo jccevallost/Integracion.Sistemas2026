@@ -280,6 +280,48 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Perfil del usuario autenticado.
+      responses:
+        '200':
+          description: Datos del usuario.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+  /auth/profile:
+    put:
+      tags: [Auth]
+      summary: Actualizar perfil del usuario autenticado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
   /payments:
     post:
       tags: [Payments]
@@ -594,6 +636,17 @@ components:
           type: array
           items:
             type: object
+    UpdateProfileRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        firstLastName:
+          type: string
+        phone:
+          type: string
+        mainAddress:
+          type: string
     CreatePaymentRequest:
       type: object
       required: [reservationId, amount, provider, transactionId]

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -175,9 +176,20 @@ class ApiClient {
     if (token != null) 'Authorization': 'Bearer $token',
   };
 
+  static const _kTimeout = Duration(seconds: 25);
+
   Uri _uri(String path, [Map<String, String>? query]) {
     return Uri.parse('$apiBaseUrl$path').replace(queryParameters: query);
   }
+
+  Future<http.Response> _get(Uri uri) =>
+      http.get(uri, headers: _headers).timeout(_kTimeout);
+
+  Future<http.Response> _post(Uri uri, Object body) =>
+      http.post(uri, headers: _headers, body: body).timeout(_kTimeout);
+
+  Future<http.Response> _put(Uri uri, Object body) =>
+      http.put(uri, headers: _headers, body: body).timeout(_kTimeout);
 
   Future<T> _decode<T>(http.Response response) async {
     late final Map<String, dynamic> body;
@@ -206,10 +218,9 @@ class ApiClient {
   }
 
   Future<AuthSession> login(String email, String password) async {
-    final response = await http.post(
+    final response = await _post(
       _uri('/auth/login'),
-      headers: _headers,
-      body: jsonEncode({'email': email, 'password': password}),
+      jsonEncode({'email': email, 'password': password}),
     );
     final data = await _decode<Map<String, dynamic>>(response);
     token = data['token']?.toString();
@@ -217,10 +228,9 @@ class ApiClient {
   }
 
   Future<AuthSession> register(RegisterInput input) async {
-    final response = await http.post(
+    final response = await _post(
       _uri('/auth/register'),
-      headers: _headers,
-      body: jsonEncode(input.toJson()),
+      jsonEncode(input.toJson()),
     );
     final data = await _decode<Map<String, dynamic>>(response);
     token = data['token']?.toString();
@@ -229,7 +239,7 @@ class ApiClient {
 
   Future<List<Flight>> searchFlights(SearchCriteria criteria) async {
     final data = await _decode<List<dynamic>>(
-      await http.get(
+      await _get(
         _uri('/flights/search', {
           'origin': criteria.origin.trim().toUpperCase(),
           'destination': criteria.destination.trim().toUpperCase(),
@@ -237,7 +247,6 @@ class ApiClient {
           'passengers': criteria.passengers.toString(),
           if (criteria.cabinClass != null) 'class': criteria.cabinClass!,
         }),
-        headers: _headers,
       ),
     );
     return data
@@ -247,7 +256,7 @@ class ApiClient {
 
   Future<List<Flight>> featuredFlights() async {
     final data = await _decode<List<dynamic>>(
-      await http.get(_uri('/flights'), headers: _headers),
+      await _get(_uri('/flights')),
     );
     return data
         .map((item) => Flight.fromJson(item as Map<String, dynamic>))
@@ -259,10 +268,9 @@ class ApiClient {
     required PassengerInput passenger,
     String? promotionCode,
   }) async {
-    final response = await http.post(
+    final response = await _post(
       _uri('/reservations'),
-      headers: _headers,
-      body: jsonEncode({
+      jsonEncode({
         'flightClassId': flightClassId,
         'passengers': [passenger.toJson()],
         if (promotionCode != null && promotionCode.trim().isNotEmpty)
@@ -274,7 +282,7 @@ class ApiClient {
 
   Future<List<Reservation>> myReservations() async {
     final data = await _decode<List<dynamic>>(
-      await http.get(_uri('/reservations/my'), headers: _headers),
+      await _get(_uri('/reservations/my')),
     );
     return data
         .map((item) => Reservation.fromJson(item as Map<String, dynamic>))
@@ -283,7 +291,7 @@ class ApiClient {
 
   Future<ReservationDetail> reservationDetail(String id) async {
     final data = await _decode<Map<String, dynamic>>(
-      await http.get(_uri('/reservations/$id'), headers: _headers),
+      await _get(_uri('/reservations/$id')),
     );
     final payments = await paymentsByReservation(id);
     return ReservationDetail.fromJson(data, payments);
@@ -291,9 +299,8 @@ class ApiClient {
 
   Future<List<Payment>> paymentsByReservation(String reservationId) async {
     final data = await _decode<List<dynamic>>(
-      await http.get(
+      await _get(
         _uri('/payments/by-reservation/$reservationId'),
-        headers: _headers,
       ),
     );
     return data
@@ -317,10 +324,9 @@ class ApiClient {
           : mainAddress.trim();
     }
     await _decode<dynamic>(
-      await http.patch(
-        _uri('/users/me'),
-        headers: _headers,
-        body: jsonEncode(body),
+      await _put(
+        _uri('/auth/profile'),
+        jsonEncode(body),
       ),
     );
   }
@@ -329,10 +335,9 @@ class ApiClient {
     Reservation reservation,
     String provider,
   ) async {
-    final response = await http.post(
+    final response = await _post(
       _uri('/payments'),
-      headers: _headers,
-      body: jsonEncode({
+      jsonEncode({
         'reservationId': reservation.id,
         'amount': reservation.total,
         'provider': provider,
@@ -3993,6 +3998,9 @@ void showMessage(BuildContext context, String message) {
 
 String connectionErrorMessage(Object error) {
   if (error is ApiException) return error.message;
+  if (error is TimeoutException) {
+    return 'La solicitud tardó demasiado (>25 s). Render puede estar iniciando — espera unos segundos y reintenta.';
+  }
   return 'No se pudo conectar con la API. Revisa Internet o espera a que Render termine de iniciar.';
 }
 
