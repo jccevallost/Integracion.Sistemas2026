@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vuelos.local/contracts/events/domain-events-v2.schema.json",
+  "title": "Vuelos Domain Event v2",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "producer",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "ReservationCreated",
+        "ReservationCancelled",
+        "SeatAssigned",
+        "CheckInCompleted",
+        "PaymentRegistered",
+        "InvoiceIssued",
+        "AncillaryAdded"
+      ]
+    },
+    "eventVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "string",
+      "enum": [
+        "booking-service",
+        "payments-service"
+      ]
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "payload": {
+      "oneOf": [
+        { "$ref": "#/$defs/reservationCreatedPayload" },
+        { "$ref": "#/$defs/reservationCancelledPayload" },
+        { "$ref": "#/$defs/paymentRegisteredPayload" },
+        { "$ref": "#/$defs/invoiceIssuedPayload" },
+        { "$ref": "#/$defs/ancillaryAddedPayload" },
+        { "type": "object" }
+      ]
+    }
+  },
+  "$defs": {
+    "reservationCreatedPayload": {
+      "type": "object",
+      "required": ["id", "reservationCode", "totalAmount", "status"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "reservationCode": { "type": "string" },
+        "userId": { "type": "string", "format": "uuid" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "reservationCancelledPayload": {
+      "type": "object",
+      "required": ["cancelled"],
+      "properties": {
+        "cancelled": { "type": "boolean" },
+        "reservationCode": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "paymentRegisteredPayload": {
+      "type": "object",
+      "required": ["id", "reservationId", "amount", "status"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "reservationId": { "type": "string", "format": "uuid" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "transactionId": { "type": "string" }
+      }
+    },
+    "invoiceIssuedPayload": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "paymentId": { "type": "string", "format": "uuid" },
+        "total": { "type": "number" }
+      }
+    },
+    "ancillaryAddedPayload": {
+      "type": "object",
+      "required": ["id", "passengerId"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "passengerId": { "type": "string", "format": "uuid" },
+        "serviceConfigId": { "type": "string", "format": "uuid" },
+        "quantity": { "type": "integer" }
+      }
+    }
+  }
+}

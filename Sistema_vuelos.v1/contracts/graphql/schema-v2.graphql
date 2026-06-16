@@ -1,0 +1,133 @@
+enum CabinClass {
+  ECONOMY
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST
+}
+
+type Query {
+  flightSearch(
+    origin: String!
+    destination: String!
+    date: String!
+    passengers: Int
+    cabinClass: CabinClass
+  ): [FlightOption!]!
+
+  reservation(id: ID!): ReservationDetail
+
+  myReservations: [Reservation!]!
+}
+
+type Mutation {
+  assignSeat(passengerId: ID!, seat: String!): ReservationPassenger!
+
+  addAncillary(
+    passengerId: ID!
+    serviceConfigId: ID!
+    reservationId: ID!
+  ): PassengerService!
+}
+
+type FlightOption {
+  id: ID!
+  departureDate: String!
+  departureDateTime: String
+  arrivalDateTime: String
+  durationMinutes: Int
+  stops: Int
+  lowestPrice: Float
+  airline: Airline
+  originAirport: Airport
+  destinationAirport: Airport
+  flightClasses: [FlightClass!]!
+  segments: [Segment!]!
+}
+
+type Airline {
+  id: ID!
+  iataCode: String!
+  name: String!
+}
+
+type Airport {
+  iataCode: String!
+  name: String!
+  city: String
+  country: String
+}
+
+type FlightClass {
+  id: ID!
+  cabinClass: String!
+  basePrice: Float!
+  availableSeats: Int!
+}
+
+type Segment {
+  id: ID!
+  originAirportIata: String!
+  destinationAirportIata: String!
+  departureDateTime: String!
+  arrivalDateTime: String!
+  segmentOrder: Int
+}
+
+type Reservation {
+  id: ID!
+  reservationCode: String!
+  status: String!
+  totalAmount: Float!
+  createdAt: String!
+}
+
+type ReservationDetail {
+  id: ID!
+  reservationCode: String!
+  status: String!
+  totalAmount: Float!
+  createdAt: String!
+  flight: FlightOption
+  passengers: [ReservationPassenger!]!
+  payments: [Payment!]!
+  boardingPasses: [BoardingPass!]!
+}
+
+type ReservationPassenger {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  documentNumber: String!
+  seatNumber: String
+  flightClassId: String
+}
+
+type Payment {
+  id: ID!
+  reservationId: ID
+  amount: Float!
+  status: String!
+  provider: String!
+  transactionId: String
+  createdAt: String!
+}
+
+type BoardingPass {
+  id: ID!
+  passengerId: ID
+  segmentId: ID
+  boardingCode: String!
+  gate: String
+  boardingGroup: String
+  checkInAt: String
+  status: String
+}
+
+type PassengerService {
+  id: ID!
+  passengerId: ID
+  serviceConfigId: ID
+  quantity: Int!
+  unitPriceAtBooking: Float!
+  totalPrice: Float!
+}

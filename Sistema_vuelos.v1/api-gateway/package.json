@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node --import=./dist/telemetry/tracer.js dist/server.js",
+    "smoke:v2": "node scripts/smoke-v2.mjs",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {

@@ -11,6 +11,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY contracts/ ./contracts/
 ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["node", "--import=./dist/telemetry/tracer.js", "dist/server.js"]

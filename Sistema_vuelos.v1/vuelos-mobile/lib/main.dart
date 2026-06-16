@@ -6,17 +6,17 @@ import 'package:http/http.dart' as http;
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://integracion-sistemas2026.onrender.com/api/v1',
+  defaultValue: 'https://vuelos-api-gateway-v2.onrender.com/api/v2',
 );
 
 // ─── Paleta de colores ────────────────────────────────────────────────────────
-const _kNavy   = Color(0xFF0D2137);
-const _kBlue   = Color(0xFF1D4ED8);
-const _kAmber  = Color(0xFFF59E0B);
-const _kBg     = Color(0xFFEFF6FF);
-const _kGreen  = Color(0xFF16A34A);
+const _kNavy = Color(0xFF0D2137);
+const _kBlue = Color(0xFF1D4ED8);
+const _kAmber = Color(0xFFF59E0B);
+const _kBg = Color(0xFFEFF6FF);
+const _kGreen = Color(0xFF16A34A);
 const _kOrange = Color(0xFFEA580C);
-const _kRed    = Color(0xFFDC2626);
+const _kRed = Color(0xFFDC2626);
 
 void main() => runApp(const VuelosMobileApp());
 
@@ -35,28 +35,29 @@ class VuelosMobileApp extends StatelessWidget {
   }
 
   static ThemeData _buildTheme() {
-    const outline        = Color(0xFFCBD5E1);
+    const outline = Color(0xFFCBD5E1);
     const outlineVariant = Color(0xFFE2E8F0);
 
-    final cs = ColorScheme.fromSeed(
-      seedColor: _kBlue,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: _kBlue,
-      onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFDBEAFE),
-      onPrimaryContainer: _kNavy,
-      secondary: _kAmber,
-      onSecondary: Colors.white,
-      secondaryContainer: const Color(0xFFFEF3C7),
-      onSecondaryContainer: const Color(0xFF92400E),
-      surface: Colors.white,
-      onSurface: const Color(0xFF1E293B),
-      surfaceContainerHighest: const Color(0xFFF1F5F9),
-      onSurfaceVariant: const Color(0xFF64748B),
-      outline: outline,
-      outlineVariant: outlineVariant,
-    );
+    final cs =
+        ColorScheme.fromSeed(
+          seedColor: _kBlue,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: _kBlue,
+          onPrimary: Colors.white,
+          primaryContainer: const Color(0xFFDBEAFE),
+          onPrimaryContainer: _kNavy,
+          secondary: _kAmber,
+          onSecondary: Colors.white,
+          secondaryContainer: const Color(0xFFFEF3C7),
+          onSecondaryContainer: const Color(0xFF92400E),
+          surface: Colors.white,
+          onSurface: const Color(0xFF1E293B),
+          surfaceContainerHighest: const Color(0xFFF1F5F9),
+          onSurfaceVariant: const Color(0xFF64748B),
+          outline: outline,
+          outlineVariant: outlineVariant,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -87,7 +88,10 @@ class VuelosMobileApp extends StatelessWidget {
         ),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         labelStyle: const TextStyle(color: Color(0xFF64748B)),
         prefixIconColor: const Color(0xFF64748B),
       ),
@@ -96,14 +100,21 @@ class VuelosMobileApp extends StatelessWidget {
           backgroundColor: _kBlue,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           side: const BorderSide(color: _kBlue),
           foregroundColor: _kBlue,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -297,16 +308,27 @@ class ApiClient {
     String? mainAddress,
   }) async {
     final body = <String, dynamic>{};
-    if (firstName    != null) body['firstName']    = firstName.trim();
+    if (firstName != null) body['firstName'] = firstName.trim();
     if (firstLastName != null) body['firstLastName'] = firstLastName.trim();
-    if (phone        != null) body['phone']        = phone.trim();
-    if (mainAddress  != null) body['mainAddress']  = mainAddress.trim().isEmpty ? 'Sin direccion' : mainAddress.trim();
+    if (phone != null) body['phone'] = phone.trim();
+    if (mainAddress != null) {
+      body['mainAddress'] = mainAddress.trim().isEmpty
+          ? 'Sin direccion'
+          : mainAddress.trim();
+    }
     await _decode<dynamic>(
-      await http.patch(_uri('/users/me'), headers: _headers, body: jsonEncode(body)),
+      await http.patch(
+        _uri('/users/me'),
+        headers: _headers,
+        body: jsonEncode(body),
+      ),
     );
   }
 
-  Future<Payment> payReservation(Reservation reservation, String provider) async {
+  Future<Payment> payReservation(
+    Reservation reservation,
+    String provider,
+  ) async {
     final response = await http.post(
       _uri('/payments'),
       headers: _headers,
@@ -462,10 +484,11 @@ class AuthSession {
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>? ?? json;
-    final tok  = json['token']?.toString() ?? '';
+    final tok = json['token']?.toString() ?? '';
     return AuthSession(
       token: tok,
-      userName: '${user['firstName'] ?? ''} ${user['firstLastName'] ?? ''}'.trim(),
+      userName: '${user['firstName'] ?? ''} ${user['firstLastName'] ?? ''}'
+          .trim(),
       role: user['role']?.toString() ?? 'CUSTOMER',
       id: user['id']?.toString(),
       email: user['email']?.toString(),
@@ -506,22 +529,24 @@ class Flight {
 
   factory Flight.fromJson(Map<String, dynamic> json) {
     final route = json['route'] as Map<String, dynamic>? ?? {};
-    final originAirport =
-        route['originAirport'] as Map<String, dynamic>? ?? {};
+    final originAirport = route['originAirport'] as Map<String, dynamic>? ?? {};
     final destinationAirport =
         route['destinationAirport'] as Map<String, dynamic>? ?? {};
-    final classes = (json['flightClasses'] as List<dynamic>? ??
-            json['classes'] as List<dynamic>? ??
-            [])
-        .map((item) => FlightClass.fromJson(item as Map<String, dynamic>))
-        .toList();
+    final classes =
+        (json['flightClasses'] as List<dynamic>? ??
+                json['classes'] as List<dynamic>? ??
+                [])
+            .map((item) => FlightClass.fromJson(item as Map<String, dynamic>))
+            .toList();
 
     return Flight(
       id: json['id']?.toString() ?? '',
-      origin: originAirport['iataCode']?.toString() ??
+      origin:
+          originAirport['iataCode']?.toString() ??
           json['originAirportIata']?.toString() ??
           '',
-      destination: destinationAirport['iataCode']?.toString() ??
+      destination:
+          destinationAirport['iataCode']?.toString() ??
           json['destinationAirportIata']?.toString() ??
           '',
       departureDate: json['departureDate']?.toString() ?? '',
@@ -552,7 +577,8 @@ class FlightClass {
   factory FlightClass.fromJson(Map<String, dynamic> json) {
     return FlightClass(
       id: json['id']?.toString() ?? '',
-      cabinClass: json['cabinClass']?.toString() ??
+      cabinClass:
+          json['cabinClass']?.toString() ??
           json['classType']?.toString() ??
           'ECONOMY',
       availableSeats: _int(json['availableSeats']) ?? 0,
@@ -626,8 +652,9 @@ class ReservationDetail {
     List<Payment> payments,
   ) {
     final passengers = (json['passengers'] as List<dynamic>? ?? [])
-        .map((item) =>
-            ReservationPassenger.fromJson(item as Map<String, dynamic>))
+        .map(
+          (item) => ReservationPassenger.fromJson(item as Map<String, dynamic>),
+        )
         .toList();
     return ReservationDetail(
       reservation: Reservation.fromJson(json),
@@ -761,18 +788,18 @@ Color _statusColor(String status) => switch (status.toUpperCase()) {
 };
 
 Color _cabinColor(String cabin) => switch (cabin.toUpperCase()) {
-  'FIRST'           => _kAmber,
-  'BUSINESS'        => const Color(0xFF7C3AED),
+  'FIRST' => _kAmber,
+  'BUSINESS' => const Color(0xFF7C3AED),
   'PREMIUM_ECONOMY' => const Color(0xFF0891B2),
-  _                 => _kGreen,
+  _ => _kGreen,
 };
 
 String _cabinLabel(String cabin) => switch (cabin.toUpperCase()) {
-  'ECONOMY'         => 'Economy',
+  'ECONOMY' => 'Economy',
   'PREMIUM_ECONOMY' => 'Premium Eco',
-  'BUSINESS'        => 'Business',
-  'FIRST'           => 'Primera Clase',
-  _                 => cabin.replaceAll('_', ' '),
+  'BUSINESS' => 'Business',
+  'FIRST' => 'Primera Clase',
+  _ => cabin.replaceAll('_', ' '),
 };
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
@@ -861,9 +888,9 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final origin      = TextEditingController(text: 'UIO');
+  final origin = TextEditingController(text: 'UIO');
   final destination = TextEditingController(text: 'BOG');
-  final date        = TextEditingController(
+  final date = TextEditingController(
     text: dateOnly(DateTime.now().add(const Duration(days: 1))),
   );
   final passengers = TextEditingController(text: '1');
@@ -912,12 +939,18 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     } on ApiException catch (err) {
       if (!mounted) return;
-      setState(() { flights = []; statusText = 'No se pudieron cargar recomendados: ${err.message}'; });
+      setState(() {
+        flights = [];
+        statusText = 'No se pudieron cargar recomendados: ${err.message}';
+      });
       showMessage(context, err.message);
     } catch (err) {
       if (!mounted) return;
       final msg = connectionErrorMessage(err);
-      setState(() { flights = []; statusText = msg; });
+      setState(() {
+        flights = [];
+        statusText = msg;
+      });
       showMessage(context, msg);
     } finally {
       if (mounted) setState(() => loading = false);
@@ -935,8 +968,10 @@ class _SearchScreenState extends State<SearchScreen> {
     });
     try {
       final routeFlights = (await _recommendedInventory())
-          .where((f) =>
-              f.origin == route.origin && f.destination == route.destination)
+          .where(
+            (f) =>
+                f.origin == route.origin && f.destination == route.destination,
+          )
           .toList();
       if (!mounted) return;
       if (routeFlights.isNotEmpty) {
@@ -956,7 +991,9 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } on ApiException catch (err) {
       if (!mounted) return;
-      setState(() => statusText = 'No se pudo consultar la ruta: ${err.message}');
+      setState(
+        () => statusText = 'No se pudo consultar la ruta: ${err.message}',
+      );
       showMessage(context, err.message);
     } catch (err) {
       if (!mounted) return;
@@ -1025,10 +1062,7 @@ class _SearchScreenState extends State<SearchScreen> {
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: _AviationHeader(
-              loading: loading,
-              onSearch: search,
-            ),
+            child: _AviationHeader(loading: loading, onSearch: search),
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -1090,22 +1124,27 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.list_alt_rounded,
-                        size: 18, color: Color(0xFF64748B)),
+                    const Icon(
+                      Icons.list_alt_rounded,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       showingRecommendations
                           ? 'Vuelos recomendados'
                           : 'Resultados de busqueda',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: const Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
+                        horizontal: 10,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDBEAFE),
                         borderRadius: BorderRadius.circular(20),
@@ -1125,10 +1164,14 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             SliverList.separated(
               itemCount: flights.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, i) => Padding(
                 padding: EdgeInsets.fromLTRB(
-                    16, 0, 16, i == flights.length - 1 ? 24 : 0),
+                  16,
+                  0,
+                  16,
+                  i == flights.length - 1 ? 24 : 0,
+                ),
                 child: FlightTile(
                   flight: flights[i],
                   onReserve: (fc) => showReservationSheet(
@@ -1186,8 +1229,11 @@ class _AviationHeader extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.travel_explore,
-                      color: Colors.white, size: 26),
+                  child: const Icon(
+                    Icons.travel_explore,
+                    color: Colors.white,
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -1219,18 +1265,25 @@ class _AviationHeader extends StatelessWidget {
                     backgroundColor: Colors.white,
                     foregroundColor: _kBlue,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     textStyle: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                   onPressed: loading ? null : onSearch,
                   icon: loading
                       ? const SizedBox.square(
                           dimension: 14,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: _kBlue),
+                            strokeWidth: 2,
+                            color: _kBlue,
+                          ),
                         )
                       : const Icon(Icons.search, size: 16),
                   label: const Text('Buscar'),
@@ -1328,7 +1381,8 @@ class _SearchPanelState extends State<SearchPanel> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: const Border.fromBorderSide(
-            BorderSide(color: Color(0xFFE2E8F0))),
+          BorderSide(color: Color(0xFFE2E8F0)),
+        ),
         boxShadow: [
           BoxShadow(
             color: _kBlue.withValues(alpha: 0.06),
@@ -1346,7 +1400,9 @@ class _SearchPanelState extends State<SearchPanel> {
                   controller: widget.origin,
                   textCapitalization: TextCapitalization.characters,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, letterSpacing: 1.5),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Origen',
                     prefixIcon: const Icon(Icons.flight_takeoff, size: 18),
@@ -1365,7 +1421,8 @@ class _SearchPanelState extends State<SearchPanel> {
                     foregroundColor: _kBlue,
                     minimumSize: const Size(40, 40),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   tooltip: 'Intercambiar',
                 ),
@@ -1375,7 +1432,9 @@ class _SearchPanelState extends State<SearchPanel> {
                   controller: widget.destination,
                   textCapitalization: TextCapitalization.characters,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w700, letterSpacing: 1.5),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Destino',
                     prefixIcon: const Icon(Icons.flight_land, size: 18),
@@ -1397,8 +1456,10 @@ class _SearchPanelState extends State<SearchPanel> {
                       controller: widget.date,
                       decoration: const InputDecoration(
                         labelText: 'Fecha de salida',
-                        prefixIcon:
-                            Icon(Icons.calendar_today_outlined, size: 18),
+                        prefixIcon: Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),
@@ -1411,7 +1472,8 @@ class _SearchPanelState extends State<SearchPanel> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: const Border.fromBorderSide(
-                      BorderSide(color: Color(0xFFCBD5E1))),
+                    BorderSide(color: Color(0xFFCBD5E1)),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1421,16 +1483,22 @@ class _SearchPanelState extends State<SearchPanel> {
                       icon: const Icon(Icons.remove, size: 18),
                       color: _pax > 1 ? _kBlue : Colors.grey.shade400,
                       style: IconButton.styleFrom(
-                          minimumSize: const Size(36, 36)),
+                        minimumSize: const Size(36, 36),
+                      ),
                     ),
                     Column(
                       children: [
-                        const Icon(Icons.person_outline,
-                            size: 14, color: Color(0xFF64748B)),
+                        const Icon(
+                          Icons.person_outline,
+                          size: 14,
+                          color: Color(0xFF64748B),
+                        ),
                         Text(
                           '$_pax',
                           style: const TextStyle(
-                              fontWeight: FontWeight.w800, fontSize: 15),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
                         ),
                       ],
                     ),
@@ -1439,7 +1507,8 @@ class _SearchPanelState extends State<SearchPanel> {
                       icon: const Icon(Icons.add, size: 18),
                       color: _pax < 9 ? _kBlue : Colors.grey.shade400,
                       style: IconButton.styleFrom(
-                          minimumSize: const Size(36, 36)),
+                        minimumSize: const Size(36, 36),
+                      ),
                     ),
                   ],
                 ),
@@ -1450,23 +1519,24 @@ class _SearchPanelState extends State<SearchPanel> {
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(
-                  value: 'ECONOMY',
-                  icon: Icon(Icons.airline_seat_recline_normal, size: 16),
-                  label: Text('Economy')),
+                value: 'ECONOMY',
+                icon: Icon(Icons.airline_seat_recline_normal, size: 16),
+                label: Text('Economy'),
+              ),
               ButtonSegment(
-                  value: 'BUSINESS',
-                  icon: Icon(Icons.airline_seat_flat, size: 16),
-                  label: Text('Business')),
+                value: 'BUSINESS',
+                icon: Icon(Icons.airline_seat_flat, size: 16),
+                label: Text('Business'),
+              ),
               ButtonSegment(
-                  value: 'FIRST',
-                  icon: Icon(Icons.star_outline, size: 16),
-                  label: Text('First')),
+                value: 'FIRST',
+                icon: Icon(Icons.star_outline, size: 16),
+                label: Text('First'),
+              ),
             ],
             selected: {widget.cabinClass},
             onSelectionChanged: (s) => widget.onCabinChanged(s.first),
-            style: ButtonStyle(
-              visualDensity: VisualDensity.compact,
-            ),
+            style: ButtonStyle(visualDensity: VisualDensity.compact),
           ),
         ],
       ),
@@ -1505,9 +1575,9 @@ class RecommendedRoutesPanel extends StatelessWidget {
             Text(
               'Rutas rapidas',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E293B),
-                  ),
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1E293B),
+              ),
             ),
             const Spacer(),
             TextButton.icon(
@@ -1523,12 +1593,12 @@ class RecommendedRoutesPanel extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 110,
+          height: 116,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.none,
             itemCount: recommendedRoutes.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
             itemBuilder: (context, i) {
               final route = recommendedRoutes[i];
               final grad = _gradients[i % _gradients.length];
@@ -1563,9 +1633,11 @@ class RecommendedRoutesPanel extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(route.icon,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    size: 20),
+                                Icon(
+                                  route.icon,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  size: 20,
+                                ),
                                 const Spacer(),
                                 Text(
                                   '${route.origin} → ${route.destination}',
@@ -1628,8 +1700,8 @@ class InfoBanner extends StatelessWidget {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSecondaryContainer,
-                  ),
+                color: scheme.onSecondaryContainer,
+              ),
             ),
           ),
         ],
@@ -1640,11 +1712,7 @@ class InfoBanner extends StatelessWidget {
 
 // ─── Flight Tile ──────────────────────────────────────────────────────────────
 class FlightTile extends StatelessWidget {
-  const FlightTile({
-    super.key,
-    required this.flight,
-    required this.onReserve,
-  });
+  const FlightTile({super.key, required this.flight, required this.onReserve});
 
   final Flight flight;
   final ValueChanged<FlightClass> onReserve;
@@ -1666,13 +1734,16 @@ class FlightTile extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8),
                     border: const Border.fromBorderSide(
-                        BorderSide(color: Color(0xFFDBEAFE))),
+                      BorderSide(color: Color(0xFFDBEAFE)),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1692,16 +1763,15 @@ class FlightTile extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (duration.isNotEmpty)
-                  _InfoChip(
-                    icon: Icons.schedule_outlined,
-                    label: duration,
-                  ),
+                  _InfoChip(icon: Icons.schedule_outlined, label: duration),
                 const SizedBox(width: 6),
                 _InfoChip(
                   icon: stops == 0
                       ? Icons.check_circle_outline
                       : Icons.connecting_airports_outlined,
-                  label: stops == 0 ? 'Directo' : '$stops escala${stops > 1 ? 's' : ''}',
+                  label: stops == 0
+                      ? 'Directo'
+                      : '$stops escala${stops > 1 ? 's' : ''}',
                   color: stops == 0 ? _kGreen : _kOrange,
                 ),
               ],
@@ -1756,8 +1826,7 @@ class FlightTile extends StatelessWidget {
                                 color: _kBlue.withValues(alpha: 0.35),
                               ),
                             ),
-                            const Icon(Icons.flight,
-                                size: 18, color: _kBlue),
+                            const Icon(Icons.flight, size: 18, color: _kBlue),
                             Expanded(
                               child: Container(
                                 height: 1.5,
@@ -1821,18 +1890,19 @@ class FlightTile extends StatelessWidget {
             Text(
               formatDateTime(flight.departureDate),
               style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w500),
+                fontSize: 11,
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 14),
             const Divider(),
             const SizedBox(height: 6),
             // Classes
-            ...flight.classes.map((fc) => _ClassRow(
-                  flightClass: fc,
-                  onReserve: () => onReserve(fc),
-                )),
+            ...flight.classes.map(
+              (fc) =>
+                  _ClassRow(flightClass: fc, onReserve: () => onReserve(fc)),
+            ),
           ],
         ),
       ),
@@ -1841,10 +1911,7 @@ class FlightTile extends StatelessWidget {
 }
 
 class _ClassRow extends StatelessWidget {
-  const _ClassRow({
-    required this.flightClass,
-    required this.onReserve,
-  });
+  const _ClassRow({required this.flightClass, required this.onReserve});
 
   final FlightClass flightClass;
   final VoidCallback onReserve;
@@ -1868,9 +1935,10 @@ class _ClassRow extends StatelessWidget {
             child: Text(
               _cabinLabel(flightClass.cabinClass),
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: color),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1891,7 +1959,9 @@ class _ClassRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
-              color: hasSeats ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+              color: hasSeats
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFF94A3B8),
             ),
           ),
           const SizedBox(width: 10),
@@ -1902,9 +1972,12 @@ class _ClassRow extends StatelessWidget {
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 textStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('Reservar'),
             ),
@@ -1943,7 +2016,10 @@ class _InfoChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: color),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -1998,15 +2074,20 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Future<void> openDetail(Reservation reservation) async {
-    await showReservationDetailSheet(context, widget.api, reservation,
-        onChanged: load);
+    await showReservationDetailSheet(
+      context,
+      widget.api,
+      reservation,
+      onChanged: load,
+    );
   }
 
   @override
   void didUpdateWidget(covariant TripsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isLoggedIn && !oldWidget.isLoggedIn) load();
-    if (widget.refreshTrigger != oldWidget.refreshTrigger && widget.isLoggedIn) {
+    if (widget.refreshTrigger != oldWidget.refreshTrigger &&
+        widget.isLoggedIn) {
       load();
     }
   }
@@ -2049,8 +2130,11 @@ class _TripsScreenState extends State<TripsScreen> {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.confirmation_num,
-                          color: Colors.white, size: 22),
+                      child: const Icon(
+                        Icons.confirmation_num,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -2068,8 +2152,9 @@ class _TripsScreenState extends State<TripsScreen> {
                           Text(
                             '${reservations.length} reserva${reservations.length != 1 ? 's' : ''}',
                             style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 13),
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -2102,9 +2187,8 @@ class _TripsScreenState extends State<TripsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 sliver: SliverList.separated(
                   itemCount: reservations.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, i) =>
-                      _ReservationCard(
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) => _ReservationCard(
                     reservation: reservations[i],
                     onTap: () => openDetail(reservations[i]),
                   ),
@@ -2118,10 +2202,7 @@ class _TripsScreenState extends State<TripsScreen> {
 }
 
 class _ReservationCard extends StatelessWidget {
-  const _ReservationCard({
-    required this.reservation,
-    required this.onTap,
-  });
+  const _ReservationCard({required this.reservation, required this.onTap});
 
   final Reservation reservation;
   final VoidCallback onTap;
@@ -2144,8 +2225,11 @@ class _ReservationCard extends StatelessWidget {
                       color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.airplane_ticket_outlined,
-                        color: _kBlue, size: 20),
+                    child: const Icon(
+                      Icons.airplane_ticket_outlined,
+                      color: _kBlue,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2163,7 +2247,9 @@ class _ReservationCard extends StatelessWidget {
                         Text(
                           formatDateTime(reservation.createdAt),
                           style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF94A3B8)),
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                       ],
                     ),
@@ -2179,7 +2265,9 @@ class _ReservationCard extends StatelessWidget {
                   Text(
                     'Total a pagar',
                     style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF64748B)),
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                   const Spacer(),
                   Text(
@@ -2191,8 +2279,10 @@ class _ReservationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.chevron_right_rounded,
-                      color: Colors.grey.shade400),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.grey.shade400,
+                  ),
                 ],
               ),
             ],
@@ -2222,22 +2312,25 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   // ── Login / Register controllers ──────────────────────────────────────────
-  final _email         = TextEditingController();
-  final _password      = TextEditingController();
-  final _firstName     = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _firstName = TextEditingController();
   final _firstLastName = TextEditingController();
-  final _phone         = TextEditingController();
-  final _mainAddress   = TextEditingController();
-  bool _loading    = false;
+  final _phone = TextEditingController();
+  final _mainAddress = TextEditingController();
+  bool _loading = false;
   bool _registering = false;
-  bool _obscure    = true;
-  bool _saving     = false;
+  bool _obscure = true;
+  bool _saving = false;
 
   @override
   void dispose() {
-    _email.dispose(); _password.dispose();
-    _firstName.dispose(); _firstLastName.dispose();
-    _phone.dispose(); _mainAddress.dispose();
+    _email.dispose();
+    _password.dispose();
+    _firstName.dispose();
+    _firstLastName.dispose();
+    _phone.dispose();
+    _mainAddress.dispose();
     super.dispose();
   }
 
@@ -2318,8 +2411,10 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Editar $label',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        title: Text(
+          'Editar $label',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
         content: TextField(
           controller: ctrl,
           keyboardType: keyboard,
@@ -2346,29 +2441,34 @@ class _AccountScreenState extends State<AccountScreen> {
     setState(() => _saving = true);
     try {
       await widget.api.updateProfile(
-        firstName:     fieldKey == 'firstName'     ? result : null,
+        firstName: fieldKey == 'firstName' ? result : null,
         firstLastName: fieldKey == 'firstLastName' ? result : null,
-        phone:         fieldKey == 'phone'         ? result : null,
-        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
+        phone: fieldKey == 'phone' ? result : null,
+        mainAddress: fieldKey == 'mainAddress' ? result : null,
       );
       if (!mounted) return;
-      widget.onSessionChanged(widget.session!.copyWith(
-        firstName:     fieldKey == 'firstName'     ? result : null,
-        firstLastName: fieldKey == 'firstLastName' ? result : null,
-        phone:         fieldKey == 'phone'         ? result : null,
-        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
-      ));
+      widget.onSessionChanged(
+        widget.session!.copyWith(
+          firstName: fieldKey == 'firstName' ? result : null,
+          firstLastName: fieldKey == 'firstLastName' ? result : null,
+          phone: fieldKey == 'phone' ? result : null,
+          mainAddress: fieldKey == 'mainAddress' ? result : null,
+        ),
+      );
       showMessage(context, '$label actualizado');
     } on ApiException catch (err) {
       if (!mounted) return;
       // Si el endpoint no existe todavía, actualizamos solo localmente
-      if (err.message.contains('404') || err.message.toLowerCase().contains('not found')) {
-        widget.onSessionChanged(widget.session!.copyWith(
-          firstName:     fieldKey == 'firstName'     ? result : null,
-          firstLastName: fieldKey == 'firstLastName' ? result : null,
-          phone:         fieldKey == 'phone'         ? result : null,
-          mainAddress:   fieldKey == 'mainAddress'   ? result : null,
-        ));
+      if (err.message.contains('404') ||
+          err.message.toLowerCase().contains('not found')) {
+        widget.onSessionChanged(
+          widget.session!.copyWith(
+            firstName: fieldKey == 'firstName' ? result : null,
+            firstLastName: fieldKey == 'firstLastName' ? result : null,
+            phone: fieldKey == 'phone' ? result : null,
+            mainAddress: fieldKey == 'mainAddress' ? result : null,
+          ),
+        );
         showMessage(context, '$label actualizado (local)');
       } else {
         showMessage(context, err.message);
@@ -2376,12 +2476,14 @@ class _AccountScreenState extends State<AccountScreen> {
     } catch (_) {
       if (!mounted) return;
       // Actualizar localmente aunque falle la red
-      widget.onSessionChanged(widget.session!.copyWith(
-        firstName:     fieldKey == 'firstName'     ? result : null,
-        firstLastName: fieldKey == 'firstLastName' ? result : null,
-        phone:         fieldKey == 'phone'         ? result : null,
-        mainAddress:   fieldKey == 'mainAddress'   ? result : null,
-      ));
+      widget.onSessionChanged(
+        widget.session!.copyWith(
+          firstName: fieldKey == 'firstName' ? result : null,
+          firstLastName: fieldKey == 'firstLastName' ? result : null,
+          phone: fieldKey == 'phone' ? result : null,
+          mainAddress: fieldKey == 'mainAddress' ? result : null,
+        ),
+      );
       showMessage(context, '$label actualizado (local)');
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -2420,22 +2522,31 @@ class _AccountScreenState extends State<AccountScreen> {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.person_outline,
-                      color: Colors.white, size: 22),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Cuenta',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800)),
-                    Text('Accede para gestionar tus reservas',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 13)),
+                    const Text(
+                      'Cuenta',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Accede para gestionar tus reservas',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -2447,11 +2558,21 @@ class _AccountScreenState extends State<AccountScreen> {
               children: [
                 SegmentedButton<bool>(
                   segments: const [
-                    ButtonSegment(value: false, icon: Icon(Icons.login, size: 16), label: Text('Ingresar')),
-                    ButtonSegment(value: true, icon: Icon(Icons.person_add_outlined, size: 16), label: Text('Crear cuenta')),
+                    ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.login, size: 16),
+                      label: Text('Ingresar'),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.person_add_outlined, size: 16),
+                      label: Text('Crear cuenta'),
+                    ),
                   ],
                   selected: {_registering},
-                  onSelectionChanged: _loading ? null : (v) => setState(() => _registering = v.first),
+                  onSelectionChanged: _loading
+                      ? null
+                      : (v) => setState(() => _registering = v.first),
                 ),
                 const SizedBox(height: 16),
                 InfoBanner(
@@ -2479,7 +2600,12 @@ class _AccountScreenState extends State<AccountScreen> {
                     prefixIcon: const Icon(Icons.lock_outline, size: 18),
                     suffixIcon: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
@@ -2500,7 +2626,9 @@ class _AccountScreenState extends State<AccountScreen> {
                       Expanded(
                         child: TextField(
                           controller: _firstLastName,
-                          decoration: const InputDecoration(labelText: 'Apellido'),
+                          decoration: const InputDecoration(
+                            labelText: 'Apellido',
+                          ),
                         ),
                       ),
                     ],
@@ -2527,13 +2655,21 @@ class _AccountScreenState extends State<AccountScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _loading ? null : (_registering ? _register : _login),
+                    onPressed: _loading
+                        ? null
+                        : (_registering ? _register : _login),
                     icon: _loading
                         ? const SizedBox.square(
                             dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : Icon(_registering ? Icons.person_add : Icons.login),
-                    label: Text(_registering ? 'Crear cuenta' : 'Iniciar sesion'),
+                    label: Text(
+                      _registering ? 'Crear cuenta' : 'Iniciar sesion',
+                    ),
                   ),
                 ),
               ],
@@ -2567,9 +2703,11 @@ class _AccountScreenState extends State<AccountScreen> {
                 Positioned.fill(
                   child: Align(
                     alignment: Alignment.bottomRight,
-                    child: Icon(Icons.person,
-                        size: 180,
-                        color: Colors.white.withValues(alpha: 0.04)),
+                    child: Icon(
+                      Icons.person,
+                      size: 180,
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
                   ),
                 ),
                 Padding(
@@ -2602,27 +2740,38 @@ class _AccountScreenState extends State<AccountScreen> {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (session.email != null && session.email!.isNotEmpty) ...[
+                      if (session.email != null &&
+                          session.email!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           session.email!,
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 13),
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.verified, color: Colors.white, size: 14),
+                            const Icon(
+                              Icons.verified,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               session.role,
@@ -2711,7 +2860,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     _ProfileField(
                       icon: Icons.home_outlined,
                       label: 'Direccion principal',
-                      value: (session.mainAddress?.isNotEmpty == true &&
+                      value:
+                          (session.mainAddress?.isNotEmpty == true &&
                               session.mainAddress != 'Sin direccion')
                           ? session.mainAddress!
                           : 'Sin direccion',
@@ -2737,7 +2887,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: const Border.fromBorderSide(
-                        BorderSide(color: Color(0xFFE2E8F0))),
+                      BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
                   ),
                   child: InkWell(
                     onTap: () {
@@ -2755,19 +2906,27 @@ class _AccountScreenState extends State<AccountScreen> {
                               color: _kRed.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.logout,
-                                color: _kRed, size: 18),
+                            child: const Icon(
+                              Icons.logout,
+                              color: _kRed,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           const Expanded(
-                            child: Text('Cerrar sesion',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                    color: Color(0xFF1E293B))),
+                            child: Text(
+                              'Cerrar sesion',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
                           ),
-                          Icon(Icons.chevron_right,
-                              color: Colors.grey.shade400),
+                          Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey.shade400,
+                          ),
                         ],
                       ),
                     ),
@@ -2821,8 +2980,11 @@ class HeaderBand extends StatelessWidget {
           Positioned(
             right: -20,
             top: -20,
-            child: Icon(icon,
-                size: 120, color: Colors.white.withValues(alpha: 0.06)),
+            child: Icon(
+              icon,
+              size: 120,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -2846,16 +3008,14 @@ class HeaderBand extends StatelessWidget {
                       Text(
                         subtitle,
                         style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 13),
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                if (action != null) ...[
-                  const SizedBox(width: 10),
-                  action!,
-                ],
+                if (action != null) ...[const SizedBox(width: 10), action!],
               ],
             ),
           ),
@@ -2879,10 +3039,9 @@ class HeaderLine extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         ?trailingWidget,
@@ -2925,9 +3084,9 @@ class EmptyState extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1E293B),
-                  ),
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1E293B),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -2997,8 +3156,8 @@ Future<void> showReservationSheet(
   VoidCallback? onCreated,
 }) async {
   final firstName = TextEditingController();
-  final lastName  = TextEditingController();
-  final document  = TextEditingController();
+  final lastName = TextEditingController();
+  final document = TextEditingController();
   final promotion = TextEditingController();
   bool loading = false;
   String? selectedSeat;
@@ -3039,7 +3198,10 @@ Future<void> showReservationSheet(
               );
               if (!context.mounted || !sheetContext.mounted) return;
               Navigator.pop(sheetContext);
-              showMessage(context, 'Reserva ${reservation.code} creada · Asiento $selectedSeat');
+              showMessage(
+                context,
+                'Reserva ${reservation.code} creada · Asiento $selectedSeat',
+              );
               onCreated?.call();
             } on ApiException catch (err) {
               if (!context.mounted) return;
@@ -3054,7 +3216,9 @@ Future<void> showReservationSheet(
 
           return Padding(
             padding: EdgeInsets.fromLTRB(
-              20, 12, 20,
+              20,
+              12,
+              20,
               MediaQuery.of(context).viewInsets.bottom + 20,
             ),
             child: Column(
@@ -3070,8 +3234,11 @@ Future<void> showReservationSheet(
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.airplane_ticket_outlined,
-                          color: _kBlue, size: 20),
+                      child: const Icon(
+                        Icons.airplane_ticket_outlined,
+                        color: _kBlue,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -3080,11 +3247,17 @@ Future<void> showReservationSheet(
                         children: [
                           const Text(
                             'Nueva Reserva',
-                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
                           ),
                           Text(
                             '${_cabinLabel(flightClass.cabinClass)} · \$${flightClass.basePrice.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -3092,14 +3265,20 @@ Future<void> showReservationSheet(
                     IconButton(
                       onPressed: () => Navigator.pop(sheetContext),
                       icon: const Icon(Icons.close),
-                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9)),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
                 const Text(
                   'Datos del pasajero',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF64748B)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -3117,7 +3296,9 @@ Future<void> showReservationSheet(
                     Expanded(
                       child: TextField(
                         controller: lastName,
-                        decoration: const InputDecoration(labelText: 'Apellido'),
+                        decoration: const InputDecoration(
+                          labelText: 'Apellido',
+                        ),
                       ),
                     ),
                   ],
@@ -3144,7 +3325,10 @@ Future<void> showReservationSheet(
                 GestureDetector(
                   onTap: loading ? null : pickSeat,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: selectedSeat != null
                           ? _kGreen.withValues(alpha: 0.08)
@@ -3162,7 +3346,9 @@ Future<void> showReservationSheet(
                           selectedSeat != null
                               ? Icons.event_seat
                               : Icons.event_seat_outlined,
-                          color: selectedSeat != null ? _kGreen : const Color(0xFF64748B),
+                          color: selectedSeat != null
+                              ? _kGreen
+                              : const Color(0xFF64748B),
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -3172,14 +3358,20 @@ Future<void> showReservationSheet(
                                 ? 'Asiento seleccionado: $selectedSeat'
                                 : 'Seleccionar asiento (obligatorio)',
                             style: TextStyle(
-                              color: selectedSeat != null ? _kGreen : const Color(0xFF64748B),
-                              fontWeight: selectedSeat != null ? FontWeight.w700 : FontWeight.normal,
+                              color: selectedSeat != null
+                                  ? _kGreen
+                                  : const Color(0xFF64748B),
+                              fontWeight: selectedSeat != null
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
                             ),
                           ),
                         ),
                         Icon(
                           Icons.chevron_right,
-                          color: selectedSeat != null ? _kGreen : Colors.grey.shade400,
+                          color: selectedSeat != null
+                              ? _kGreen
+                              : Colors.grey.shade400,
                           size: 18,
                         ),
                       ],
@@ -3196,11 +3388,20 @@ Future<void> showReservationSheet(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total a pagar',
-                          style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                      const Text(
+                        'Total a pagar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
                       Text(
                         '\$${flightClass.basePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _kBlue),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _kBlue,
+                        ),
                       ),
                     ],
                   ),
@@ -3211,7 +3412,10 @@ Future<void> showReservationSheet(
                   icon: loading
                       ? const SizedBox.square(
                           dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.check_circle_outline),
                   label: Text(loading ? 'Procesando...' : 'Confirmar reserva'),
@@ -3234,16 +3438,17 @@ Future<void> showReservationDetailSheet(
 }) async {
   String provider = 'VISA';
   bool paying = false;
-  late Future<ReservationDetail> detailFuture =
-      api.reservationDetail(reservation.id);
+  late Future<ReservationDetail> detailFuture = api.reservationDetail(
+    reservation.id,
+  );
 
   // Campos de tarjeta de crédito
   final cardNumber = TextEditingController();
-  final cardExpiry  = TextEditingController();
-  final cardCvv     = TextEditingController();
-  final cardHolder  = TextEditingController();
-  final paypalEmail  = TextEditingController();
-  final transferRef  = TextEditingController();
+  final cardExpiry = TextEditingController();
+  final cardCvv = TextEditingController();
+  final cardHolder = TextEditingController();
+  final paypalEmail = TextEditingController();
+  final transferRef = TextEditingController();
 
   await showModalBottomSheet<void>(
     context: context,
@@ -3307,8 +3512,7 @@ Future<void> showReservationDetailSheet(
                   children: [
                     // Fixed header
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: Column(
                         children: [
                           const _SheetHandle(),
@@ -3316,8 +3520,7 @@ Future<void> showReservationDetailSheet(
                             children: [
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       reservation.code,
@@ -3332,21 +3535,21 @@ Future<void> showReservationDetailSheet(
                                         _StatusBadge(reservation.status),
                                         const SizedBox(width: 8),
                                         if (detail != null)
-                                          _StatusBadge(detail.isPaid
-                                              ? 'PAGADO'
-                                              : 'PENDIENTE PAGO'),
+                                          _StatusBadge(
+                                            detail.isPaid
+                                                ? 'PAGADO'
+                                                : 'PENDIENTE PAGO',
+                                          ),
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
                               IconButton(
-                                onPressed: () =>
-                                    Navigator.pop(sheetContext),
+                                onPressed: () => Navigator.pop(sheetContext),
                                 icon: const Icon(Icons.close),
                                 style: IconButton.styleFrom(
-                                  backgroundColor:
-                                      const Color(0xFFF1F5F9),
+                                  backgroundColor: const Color(0xFFF1F5F9),
                                 ),
                               ),
                             ],
@@ -3363,39 +3566,40 @@ Future<void> showReservationDetailSheet(
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       formatDateTime(reservation.createdAt),
                                       style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.65),
-                                          fontSize: 11),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.65,
+                                        ),
+                                        fontSize: 11,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     const Text(
                                       'Fecha de reserva',
                                       style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13),
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     const Text(
                                       'Total',
                                       style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11),
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                     Text(
                                       '\$${reservation.total.toStringAsFixed(2)}',
@@ -3418,7 +3622,9 @@ Future<void> showReservationDetailSheet(
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.fromLTRB(
-                          20, 8, 20,
+                          20,
+                          8,
+                          20,
                           MediaQuery.of(context).viewInsets.bottom + 20,
                         ),
                         children: [
@@ -3427,8 +3633,8 @@ Future<void> showReservationDetailSheet(
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Center(
-                                  child: CircularProgressIndicator(
-                                      color: _kBlue)),
+                                child: CircularProgressIndicator(color: _kBlue),
+                              ),
                             ),
                           if (snapshot.hasError)
                             EmptyState(
@@ -3451,33 +3657,31 @@ Future<void> showReservationDetailSheet(
                             else
                               ...detail.passengers.map(
                                 (p) => Container(
-                                  margin:
-                                      const EdgeInsets.only(bottom: 8),
+                                  margin: const EdgeInsets.only(bottom: 8),
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color:
-                                        const Color(0xFFF8FAFC),
-                                    borderRadius:
-                                        BorderRadius.circular(12),
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: const Border.fromBorderSide(
-                                        BorderSide(
-                                            color: Color(0xFFE2E8F0))),
+                                      BorderSide(color: Color(0xFFE2E8F0)),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
                                       CircleAvatar(
                                         radius: 18,
-                                        backgroundColor:
-                                            const Color(0xFFDBEAFE),
+                                        backgroundColor: const Color(
+                                          0xFFDBEAFE,
+                                        ),
                                         child: Text(
                                           p.firstName.isNotEmpty
-                                              ? p.firstName[0]
-                                                  .toUpperCase()
+                                              ? p.firstName[0].toUpperCase()
                                               : '?',
                                           style: const TextStyle(
-                                              color: _kBlue,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 14),
+                                            color: _kBlue,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -3489,15 +3693,15 @@ Future<void> showReservationDetailSheet(
                                             Text(
                                               '${p.firstName} ${p.lastName}',
                                               style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w700),
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
                                             Text(
                                               p.documentNumber,
                                               style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color:
-                                                      Color(0xFF64748B)),
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -3505,12 +3709,14 @@ Future<void> showReservationDetailSheet(
                                       if (p.seatNumber != null)
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color:
-                                                const Color(0xFFDBEAFE),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
+                                            color: const Color(0xFFDBEAFE),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Text(
                                             'Asiento\n${p.seatNumber}',
@@ -3540,26 +3746,26 @@ Future<void> showReservationDetailSheet(
                             else
                               ...detail.payments.map(
                                 (pay) => Container(
-                                  margin:
-                                      const EdgeInsets.only(bottom: 8),
+                                  margin: const EdgeInsets.only(bottom: 8),
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF8FAFC),
-                                    borderRadius:
-                                        BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: const Border.fromBorderSide(
-                                        BorderSide(
-                                            color: Color(0xFFE2E8F0))),
+                                      BorderSide(color: Color(0xFFE2E8F0)),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
                                       Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: _statusColor(pay.status)
-                                              .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          color: _statusColor(
+                                            pay.status,
+                                          ).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Icon(
                                           Icons.payments_outlined,
@@ -3576,17 +3782,16 @@ Future<void> showReservationDetailSheet(
                                             Text(
                                               pay.provider,
                                               style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w700,
-                                                  fontSize: 13),
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13,
+                                              ),
                                             ),
                                             Text(
-                                              formatDateTime(
-                                                  pay.createdAt),
+                                              formatDateTime(pay.createdAt),
                                               style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color:
-                                                      Color(0xFF94A3B8)),
+                                                fontSize: 11,
+                                                color: Color(0xFF94A3B8),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -3598,8 +3803,9 @@ Future<void> showReservationDetailSheet(
                                           Text(
                                             '\$${pay.amount.toStringAsFixed(2)}',
                                             style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 14),
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                           _StatusBadge(pay.status),
                                         ],
@@ -3620,20 +3826,36 @@ Future<void> showReservationDetailSheet(
                                 decoration: const InputDecoration(
                                   labelText: 'Seleccionar metodo',
                                   prefixIcon: Icon(
-                                      Icons.account_balance_wallet_outlined,
-                                      size: 18),
+                                    Icons.account_balance_wallet_outlined,
+                                    size: 18,
+                                  ),
                                 ),
                                 items: const [
-                                  DropdownMenuItem(value: 'VISA',       child: Text('💳  Visa')),
-                                  DropdownMenuItem(value: 'MASTERCARD', child: Text('💳  Mastercard')),
-                                  DropdownMenuItem(value: 'PAYPAL',     child: Text('🅿️  PayPal')),
-                                  DropdownMenuItem(value: 'TRANSFER',   child: Text('🏦  Transferencia')),
+                                  DropdownMenuItem(
+                                    value: 'VISA',
+                                    child: Text('💳  Visa'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'MASTERCARD',
+                                    child: Text('💳  Mastercard'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'PAYPAL',
+                                    child: Text('🅿️  PayPal'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'TRANSFER',
+                                    child: Text('🏦  Transferencia'),
+                                  ),
                                 ],
-                                onChanged: paying ? null : (v) => setState(() => provider = v!),
+                                onChanged: paying
+                                    ? null
+                                    : (v) => setState(() => provider = v!),
                               ),
                               const SizedBox(height: 14),
                               // ── Formulario según método ──────────────────
-                              if (provider == 'VISA' || provider == 'MASTERCARD')
+                              if (provider == 'VISA' ||
+                                  provider == 'MASTERCARD')
                                 _CardForm(
                                   brand: provider,
                                   cardNumber: cardNumber,
@@ -3649,7 +3871,10 @@ Future<void> showReservationDetailSheet(
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: const InputDecoration(
                                     labelText: 'Email de PayPal',
-                                    prefixIcon: Icon(Icons.email_outlined, size: 18),
+                                    prefixIcon: Icon(
+                                      Icons.email_outlined,
+                                      size: 18,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -3659,7 +3884,10 @@ Future<void> showReservationDetailSheet(
                                   enabled: !paying,
                                   decoration: const InputDecoration(
                                     labelText: 'Referencia de transferencia',
-                                    prefixIcon: Icon(Icons.tag_outlined, size: 18),
+                                    prefixIcon: Icon(
+                                      Icons.tag_outlined,
+                                      size: 18,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -3670,12 +3898,17 @@ Future<void> showReservationDetailSheet(
                                 icon: paying
                                     ? const SizedBox.square(
                                         dimension: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
                                       )
                                     : const Icon(Icons.lock_outline),
-                                label: Text(paying
-                                    ? 'Procesando...'
-                                    : 'Pagar \$${reservation.total.toStringAsFixed(2)}'),
+                                label: Text(
+                                  paying
+                                      ? 'Procesando...'
+                                      : 'Pagar \$${reservation.total.toStringAsFixed(2)}',
+                                ),
                               ),
                             ] else
                               Container(
@@ -3684,14 +3917,17 @@ Future<void> showReservationDetailSheet(
                                   color: _kGreen.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                      color: _kGreen.withValues(alpha: 0.3)),
+                                    color: _kGreen.withValues(alpha: 0.3),
+                                  ),
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.verified,
-                                        color: _kGreen, size: 20),
+                                    Icon(
+                                      Icons.verified,
+                                      color: _kGreen,
+                                      size: 20,
+                                    ),
                                     SizedBox(width: 8),
                                     Text(
                                       'Reserva pagada correctamente',
@@ -3764,10 +4000,10 @@ String formatDateTime(String value) {
   if (value.isEmpty) return '--';
   final parsed = DateTime.tryParse(value);
   if (parsed == null) return value;
-  final y   = parsed.year.toString().padLeft(4, '0');
-  final mo  = parsed.month.toString().padLeft(2, '0');
-  final d   = parsed.day.toString().padLeft(2, '0');
-  final h   = parsed.hour.toString().padLeft(2, '0');
+  final y = parsed.year.toString().padLeft(4, '0');
+  final mo = parsed.month.toString().padLeft(2, '0');
+  final d = parsed.day.toString().padLeft(2, '0');
+  final h = parsed.hour.toString().padLeft(2, '0');
   final min = parsed.minute.toString().padLeft(2, '0');
   return '$y-$mo-$d $h:$min';
 }
@@ -3813,7 +4049,9 @@ class _CardFormState extends State<_CardForm> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (isVisa ? _kBlue : const Color(0xFFEB5757)).withValues(alpha: 0.3),
+            color: (isVisa ? _kBlue : const Color(0xFFEB5757)).withValues(
+              alpha: 0.3,
+            ),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -3836,7 +4074,11 @@ class _CardFormState extends State<_CardForm> {
                 ),
               ),
               const Spacer(),
-              Icon(Icons.contactless, color: Colors.white.withValues(alpha: 0.7), size: 22),
+              Icon(
+                Icons.contactless,
+                color: Colors.white.withValues(alpha: 0.7),
+                size: 22,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -3867,11 +4109,19 @@ class _CardFormState extends State<_CardForm> {
             decoration: InputDecoration(
               counterText: '',
               labelText: 'Numero de tarjeta',
-              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+              labelStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
               hintText: '0000 0000 0000 0000',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), letterSpacing: 3),
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                letterSpacing: 3,
+              ),
               enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
               ),
               focusedBorder: const UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.white, width: 2),
@@ -3890,15 +4140,25 @@ class _CardFormState extends State<_CardForm> {
                   keyboardType: TextInputType.number,
                   maxLength: 5,
                   inputFormatters: [_ExpiryFormatter()],
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                   decoration: InputDecoration(
                     counterText: '',
                     labelText: 'Vencimiento',
-                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                    labelStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
                     hintText: 'MM/AA',
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
                     enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
                     focusedBorder: const UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.white, width: 2),
@@ -3917,23 +4177,35 @@ class _CardFormState extends State<_CardForm> {
                   keyboardType: TextInputType.number,
                   maxLength: 4,
                   obscureText: _obscureCvv,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                   decoration: InputDecoration(
                     counterText: '',
                     labelText: 'CVV',
-                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                    labelStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
                     hintText: '•••',
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
                     suffixIcon: GestureDetector(
                       onTap: () => setState(() => _obscureCvv = !_obscureCvv),
                       child: Icon(
-                        _obscureCvv ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        _obscureCvv
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: Colors.white.withValues(alpha: 0.6),
                         size: 16,
                       ),
                     ),
                     enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
                     focusedBorder: const UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.white, width: 2),
@@ -3950,14 +4222,26 @@ class _CardFormState extends State<_CardForm> {
             controller: widget.holder,
             enabled: widget.enabled,
             textCapitalization: TextCapitalization.characters,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 1),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
             decoration: InputDecoration(
               labelText: 'Nombre del titular',
-              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+              labelStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
               hintText: 'TAL COMO APARECE EN LA TARJETA',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 11),
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 11,
+              ),
               enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
               ),
               focusedBorder: const UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.white, width: 2),
@@ -3975,7 +4259,10 @@ class _CardFormState extends State<_CardForm> {
 // Formateador número de tarjeta: XXXX XXXX XXXX XXXX
 class _CardNumberFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue old,
+    TextEditingValue next,
+  ) {
     final digits = next.text.replaceAll(RegExp(r'\D'), '');
     final buffer = StringBuffer();
     for (int i = 0; i < digits.length && i < 16; i++) {
@@ -3993,10 +4280,14 @@ class _CardNumberFormatter extends TextInputFormatter {
 // Formateador vencimiento: MM/AA
 class _ExpiryFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue old,
+    TextEditingValue next,
+  ) {
     final digits = next.text.replaceAll(RegExp(r'\D'), '');
     if (digits.length <= 2) return next.copyWith(text: digits);
-    final str = '${digits.substring(0, 2)}/${digits.substring(2, digits.length.clamp(0, 4))}';
+    final str =
+        '${digits.substring(0, 2)}/${digits.substring(2, digits.length.clamp(0, 4))}';
     return TextEditingValue(
       text: str,
       selection: TextSelection.collapsed(offset: str.length),
@@ -4032,11 +4323,14 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
     super.initState();
     final cabin = widget.flightClass.cabinClass.toUpperCase();
     if (cabin == 'FIRST') {
-      _rows = 4; _cols = ['A', 'B'];
+      _rows = 4;
+      _cols = ['A', 'B'];
     } else if (cabin == 'BUSINESS') {
-      _rows = 8; _cols = ['A', 'B', 'C', 'D'];
+      _rows = 8;
+      _cols = ['A', 'B', 'C', 'D'];
     } else {
-      _rows = 30; _cols = ['A', 'B', 'C', 'D', 'E', 'F'];
+      _rows = 30;
+      _cols = ['A', 'B', 'C', 'D', 'E', 'F'];
     }
     final totalSeats = _rows * _cols.length;
     _taken = _computeTakenSeats(
@@ -4070,7 +4364,9 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
     final cabin = widget.flightClass.cabinClass.toUpperCase();
     final isWide = cabin == 'FIRST' || cabin == 'BUSINESS';
     // Determinar índice del pasillo (entre col B-C en economy, A-B en business/first)
-    final aisleAfter = isWide ? 1 : 2; // índice (0-based) después del cual va el pasillo
+    final aisleAfter = isWide
+        ? 1
+        : 2; // índice (0-based) después del cual va el pasillo
 
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.88,
@@ -4090,18 +4386,30 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.event_seat, color: _kBlue, size: 20),
+                      child: const Icon(
+                        Icons.event_seat,
+                        color: _kBlue,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Plano de cabina',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                          const Text(
+                            'Plano de cabina',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
                           Text(
                             '${_cabinLabel(widget.flightClass.cabinClass)} · ${widget.flightClass.availableSeats} disponibles',
-                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -4109,7 +4417,9 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                     IconButton(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
-                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9)),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                      ),
                     ),
                   ],
                 ),
@@ -4118,9 +4428,15 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _SeatLegend(color: const Color(0xFFE2E8F0), label: 'Disponible'),
+                    _SeatLegend(
+                      color: const Color(0xFFE2E8F0),
+                      label: 'Disponible',
+                    ),
                     const SizedBox(width: 16),
-                    _SeatLegend(color: _kRed.withValues(alpha: 0.8), label: 'Ocupado'),
+                    _SeatLegend(
+                      color: _kRed.withValues(alpha: 0.8),
+                      label: 'Ocupado',
+                    ),
                     const SizedBox(width: 16),
                     _SeatLegend(color: _kBlue, label: 'Seleccionado'),
                   ],
@@ -4152,9 +4468,10 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                           '$row',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF94A3B8),
-                              fontWeight: FontWeight.w600),
+                            fontSize: 11,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -4164,14 +4481,18 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             for (int ci = 0; ci < _cols.length; ci++) ...[
-                              if (ci == aisleAfter + 1) const SizedBox(width: 20),
+                              if (ci == aisleAfter + 1)
+                                const SizedBox(width: 20),
                               _SeatButton(
                                 label: '$row${_cols[ci]}',
                                 isTaken: _taken.contains('$row${_cols[ci]}'),
                                 isSelected: _selected == '$row${_cols[ci]}',
-                                onTap: () => setState(() => _selected = '$row${_cols[ci]}'),
+                                onTap: () => setState(
+                                  () => _selected = '$row${_cols[ci]}',
+                                ),
                               ),
-                              if (ci < _cols.length - 1 && ci != aisleAfter) const SizedBox(width: 6),
+                              if (ci < _cols.length - 1 && ci != aisleAfter)
+                                const SizedBox(width: 6),
                             ],
                           ],
                         ),
@@ -4184,7 +4505,12 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
           ),
           // Botón confirmar
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 16),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              8,
+              20,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             child: Column(
               children: [
                 if (_selected != null)
@@ -4201,7 +4527,10 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                       'Asiento seleccionado: $_selected',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          color: _kBlue, fontWeight: FontWeight.w700, fontSize: 15),
+                        color: _kBlue,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 SizedBox(
@@ -4211,9 +4540,11 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                         ? null
                         : () => Navigator.pop(context, _selected),
                     icon: const Icon(Icons.check_circle_outline),
-                    label: Text(_selected == null
-                        ? 'Selecciona un asiento'
-                        : 'Confirmar asiento $_selected'),
+                    label: Text(
+                      _selected == null
+                          ? 'Selecciona un asiento'
+                          : 'Confirmar asiento $_selected',
+                    ),
                   ),
                 ),
               ],
@@ -4265,8 +4596,8 @@ class _SeatButton extends StatelessWidget {
             color: isTaken
                 ? _kRed.withValues(alpha: 0.4)
                 : isSelected
-                    ? _kBlue
-                    : const Color(0xFFCBD5E1),
+                ? _kBlue
+                : const Color(0xFFCBD5E1),
           ),
         ),
         child: Center(
@@ -4274,7 +4605,11 @@ class _SeatButton extends StatelessWidget {
               ? Icon(Icons.close, size: 12, color: fg)
               : Text(
                   label.replaceAll(RegExp(r'[0-9]'), ''),
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
                 ),
         ),
       ),
@@ -4304,12 +4639,14 @@ class _SeatRowHeader extends StatelessWidget {
                     cols[ci],
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B)),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
-                if (ci < cols.length - 1 && ci != aisleAfter) const SizedBox(width: 6),
+                if (ci < cols.length - 1 && ci != aisleAfter)
+                  const SizedBox(width: 6),
               ],
             ],
           ),
@@ -4338,8 +4675,10 @@ class _SeatLegend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 5),
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
       ],
     );
   }
@@ -4379,7 +4718,8 @@ class _ProfileCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: const Border.fromBorderSide(
-            BorderSide(color: Color(0xFFE2E8F0))),
+          BorderSide(color: Color(0xFFE2E8F0)),
+        ),
       ),
       child: Column(children: children),
     );
@@ -4430,24 +4770,34 @@ class _ProfileField extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF94A3B8),
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(value,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF1E293B),
-                          fontWeight: FontWeight.w500)),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
             ),
             if (readOnly)
               const Icon(Icons.lock_outline, size: 16, color: Color(0xFFCBD5E1))
             else
-              const Icon(Icons.edit_outlined, size: 17, color: Color(0xFF94A3B8)),
+              const Icon(
+                Icons.edit_outlined,
+                size: 17,
+                color: Color(0xFF94A3B8),
+              ),
           ],
         ),
       ),

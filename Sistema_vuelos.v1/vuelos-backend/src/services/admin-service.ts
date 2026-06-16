@@ -30,7 +30,7 @@ import { AuditLogController } from '../modules/api_audit_logs/controllers/AuditL
 import { createAdminRouter }    from '../modules/api_admin/routes/admin.routes.js';
 import { createAuditLogRouter } from '../modules/api_audit_logs/routes/audit-logs.routes.js';
 
-const PORT = Number(process.env.ADMIN_SERVICE_PORT) || 3006;
+const PORT = Number(process.env.PORT ?? process.env.ADMIN_SERVICE_PORT) || 3006;
 
 validateJwtConfig();
 

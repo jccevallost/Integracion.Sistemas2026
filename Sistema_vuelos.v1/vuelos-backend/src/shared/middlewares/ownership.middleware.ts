@@ -262,15 +262,11 @@ export function requireBoardingPassCreateAllowed(db: PrismaClient) {
 
       const passenger = await db.reservationPassenger.findUnique({
         where: { id: passengerId },
-        include: { reservation: { include: { flight: { include: { segments: { select: { id: true } } } } } } },
+        include: { reservation: { select: { userId: true, flightId: true } } },
       });
       if (!passenger) return deny(res, 404, 'NOT_FOUND', 'Pasajero no encontrado');
       if (!isAdmin(req) && passenger.reservation.userId !== userId(req)) {
         return deny(res, 403, 'FORBIDDEN', 'Sin permisos para este pasajero');
-      }
-      const segmentBelongsToReservation = passenger.reservation.flight.segments.some(s => s.id === segmentId);
-      if (!segmentBelongsToReservation) {
-        return deny(res, 400, 'VALIDATION_ERROR', 'El segmento no pertenece al vuelo de la reserva');
       }
       next();
     } catch (err) { next(err); }

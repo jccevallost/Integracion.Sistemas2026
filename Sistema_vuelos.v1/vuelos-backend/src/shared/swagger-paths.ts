@@ -296,10 +296,10 @@
  *
  *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
  *     servers:
- *       - url: https://integracion-sistemas2026.onrender.com
- *         description: Producción
+ *       - url: http://localhost:3003
+ *         description: flights-service interno
  *       - url: http://localhost:3000
- *         description: Desarrollo local
+ *         description: Desarrollo local flights-service
  *     parameters:
  *       - in: path
  *         name: id
@@ -349,10 +349,10 @@
  *
  *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
  *     servers:
- *       - url: https://integracion-sistemas2026.onrender.com
- *         description: Producción
+ *       - url: http://localhost:3003
+ *         description: flights-service interno
  *       - url: http://localhost:3000
- *         description: Desarrollo local
+ *         description: Desarrollo local flights-service
  *     parameters:
  *       - in: path
  *         name: id
@@ -388,10 +388,10 @@
  *
  *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
  *     servers:
- *       - url: https://integracion-sistemas2026.onrender.com
- *         description: Producción
+ *       - url: http://localhost:3003
+ *         description: flights-service interno
  *       - url: http://localhost:3000
- *         description: Desarrollo local
+ *         description: Desarrollo local flights-service
  *     parameters:
  *       - in: path
  *         name: code
@@ -425,10 +425,10 @@
  *
  *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
  *     servers:
- *       - url: https://integracion-sistemas2026.onrender.com
- *         description: Producción
+ *       - url: http://localhost:3003
+ *         description: flights-service interno
  *       - url: http://localhost:3000
- *         description: Desarrollo local
+ *         description: Desarrollo local flights-service
  *     parameters:
  *       - in: path
  *         name: id
@@ -463,10 +463,10 @@
  *
  *       **Header requerido:** `x-internal-api-key: <INTERNAL_API_KEY>`
  *     servers:
- *       - url: https://integracion-sistemas2026.onrender.com
- *         description: Producción
+ *       - url: http://localhost:3003
+ *         description: flights-service interno
  *       - url: http://localhost:3000
- *         description: Desarrollo local
+ *         description: Desarrollo local flights-service
  *     parameters:
  *       - in: path
  *         name: id

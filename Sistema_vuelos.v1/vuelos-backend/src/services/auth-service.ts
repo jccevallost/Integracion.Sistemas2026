@@ -11,7 +11,7 @@ import { AuthService }       from '../modules/api_users/services/AuthService.js'
 import { AuthController }    from '../modules/api_users/controllers/AuthController.js';
 import { createAuthRouter }  from '../modules/api_users/routes/auth.routes.js';
 
-const PORT = Number(process.env.AUTH_SERVICE_PORT) || 3001;
+const PORT = Number(process.env.PORT ?? process.env.AUTH_SERVICE_PORT) || 3001;
 
 validateJwtConfig();
 

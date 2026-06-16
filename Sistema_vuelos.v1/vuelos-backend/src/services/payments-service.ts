@@ -38,7 +38,7 @@ import { createInvoiceRouter }         from '../modules/api_invoices/routes/invo
 import { createInvoiceItemRouter }     from '../modules/api_invoice_items/routes/invoice-items.routes.js';
 import { createPassengerServiceRouter } from '../modules/api_passenger_services/routes/passenger-services.routes.js';
 
-const PORT = Number(process.env.PAYMENTS_SERVICE_PORT) || 3005;
+const PORT = Number(process.env.PORT ?? process.env.PAYMENTS_SERVICE_PORT) || 3005;
 
 validateJwtConfig();
 

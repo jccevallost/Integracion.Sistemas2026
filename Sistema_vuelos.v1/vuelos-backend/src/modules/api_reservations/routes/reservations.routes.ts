@@ -35,10 +35,10 @@ export function createReservationRouter(controller: ReservationController, db: P
       });
     } catch (err) { next(err); }
   });
-  router.get('/:id',           controller.getById);
-  router.delete('/:id',        controller.cancel);
+  router.get('/:id',           authenticate, controller.getById);
+  router.delete('/:id',        authenticate, controller.cancel);
   // Angular service calls PATCH /cancel — keep in sync with DELETE /:id
-  router.patch('/:id/cancel',  controller.cancel);
+  router.patch('/:id/cancel',  authenticate, controller.cancel);
 
   // ── Asignación de asiento durante check-in ───────────────────
   router.patch('/:id/passengers/:passengerId/seat', authenticate, async (req: any, res: any, next: any) => {

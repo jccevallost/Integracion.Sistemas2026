@@ -51,7 +51,7 @@ import { createAirlineAirportRouter }     from '../modules/api_airline_airports/
 import { createAirlineServiceConfigRouter } from '../modules/api_airline_service_configs/routes/airline-service-config.routes.js';
 import { createServiceCatalogRouter }     from '../modules/api_service_catalog/routes/service-catalog.routes.js';
 
-const PORT = Number(process.env.CATALOG_SERVICE_PORT) || 3002;
+const PORT = Number(process.env.PORT ?? process.env.CATALOG_SERVICE_PORT) || 3002;
 
 validateJwtConfig();
 

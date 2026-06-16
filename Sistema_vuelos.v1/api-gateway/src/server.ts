@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,6 +16,9 @@ import { buildContext, type ServiceUrls } from './graphql/context.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const contractsDir = path.resolve(__dirname, '..', 'contracts');
 
 const allowedOrigins = [
   'http://localhost:5173',
@@ -59,15 +64,44 @@ app.use(correlationId);
 app.use(globalRateLimiter);
 app.use(requestLogger);
 
+app.use('/contracts', express.static(contractsDir, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.yaml') || filePath.endsWith('.yml')) {
+      res.setHeader('Content-Type', 'application/yaml; charset=utf-8');
+    }
+    if (filePath.endsWith('.graphql')) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    }
+  },
+}));
+
+app.get('/api/v2/contracts', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      rest: '/contracts/rest/booking-api-v2.openapi.yaml',
+      graphql: '/contracts/graphql/schema-v2.graphql',
+      events: '/contracts/events/domain-events-v2.schema.json',
+    },
+  });
+});
+
 // Rate limits específicos
 app.use(
-  ['/api/v1/auth/login', '/api/v1/auth/register', '/api/auth/login', '/api/auth/register'],
+  [
+    '/api/v2/auth/login',
+    '/api/v2/auth/register',
+    '/api/v1/auth/login',
+    '/api/v1/auth/register',
+    '/api/auth/login',
+    '/api/auth/register',
+  ],
   authRateLimiter,
 );
-app.use(['/api/v1/flights/search', '/api/flights/search'], searchRateLimiter);
+app.use(['/api/v2/flights/search', '/api/v1/flights/search', '/api/flights/search'], searchRateLimiter);
 
 // ── Health check del gateway ─────────────────────────────────
-app.get(['/', '/health'], async (_req, res) => {
+app.get(['/', '/health', '/api/v2'], async (_req, res) => {
   const serviceChecks = await Promise.allSettled(
     registry.map(async (svc) => {
       const controller = new AbortController();
@@ -91,6 +125,12 @@ app.get(['/', '/health'], async (_req, res) => {
   res.status(allUp ? 200 : 207).json({
     component: 'api-gateway',
     version: '2.0.0',
+    publicApi: {
+      current: '/api/v2',
+      compatibility: '/api/v1',
+      graphql: '/graphql',
+      contracts: '/api/v2/contracts',
+    },
     status: allUp ? 'online' : 'degraded',
     services: svcs,
     circuitBreakers: getCircuitBreakerStatus(),

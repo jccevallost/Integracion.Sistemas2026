@@ -37,7 +37,7 @@ export class ReservationController {
   getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId  = req.user?.id ?? '';
-      const isAdmin = !req.user || req.user.role === 'ADMIN';
+      const isAdmin = req.user?.role === 'ADMIN';
       const data = await this.reservationService.getById(String(req.params.id), userId, isAdmin);
       res.json({ success: true, data });
     } catch (err) { next(err); }
@@ -46,7 +46,7 @@ export class ReservationController {
   cancel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId  = req.user?.id ?? '';
-      const isAdmin = !req.user || req.user.role === 'ADMIN';
+      const isAdmin = req.user?.role === 'ADMIN';
       const data = await this.reservationService.cancel(String(req.params.id), userId, isAdmin);
       res.json({ success: true, data });
     } catch (err) { next(err); }

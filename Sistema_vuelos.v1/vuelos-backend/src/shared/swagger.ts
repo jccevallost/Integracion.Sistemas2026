@@ -5,11 +5,11 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.3',
     info: {
-      title:       'Vuelos API — Sistema Integración 2026',
+      title:       'Vuelos API v2 — Sistema Integración 2026',
       version:     '2.0.0',
-      description: `## API REST — VuelosApp (Juan Cevallos)
+      description: `## API REST v2 — VuelosApp (Juan Cevallos)
 
-**Base URL producción:** \`https://integracion-sistemas2026.onrender.com/api/v1\`
+**Base URL producción:** \`https://vuelos-api-gateway-v2.onrender.com/api/v2\`
 
 ---
 
@@ -58,7 +58,7 @@ Body: {
 
 ### 5 — Endpoints internos (servicio-a-servicio)
 Requieren header: \`x-internal-api-key: <INTERNAL_API_KEY>\`
-Base: \`https://integracion-sistemas2026.onrender.com\` (sin /api/v1)
+Base recomendada: red privada Render o servicio local de flights-service (sin /api/v2)
 \`\`\`
 PATCH /internal/flight-classes/{id}/decrement-seats  Body: { "count": N }
 PATCH /internal/flight-classes/{id}/increment-seats  Body: { "count": N }
@@ -75,10 +75,9 @@ Sistema de microservicios con saga pattern. gRPC disponible en puerto 50051.`,
       },
     },
     servers: [
-      { url: 'https://integracion-sistemas2026.onrender.com/api/v1', description: 'Producción — API pública (Render)' },
-      { url: 'https://integracion-sistemas2026.onrender.com',         description: 'Producción — Base URL (endpoints /internal/*)' },
-      { url: 'http://localhost:3000/api/v1',                          description: 'Desarrollo local — API pública' },
-      { url: 'http://localhost:3000',                                  description: 'Desarrollo local — Base URL (endpoints /internal/*)' },
+      { url: 'https://vuelos-api-gateway-v2.onrender.com/api/v2', description: 'Producción — API pública (Render)' },
+      { url: 'http://localhost:3000/api/v2',                          description: 'Desarrollo local — API pública' },
+      { url: 'http://localhost:3003',                                  description: 'Desarrollo local — flights-service interno' },
     ],
     components: {
       securitySchemes: {
@@ -626,11 +625,11 @@ Sistema de microservicios con saga pattern. gRPC disponible en puerto 50051.`,
     tags: [
       {
         name: '🔗 BOOKING — Flujo de integración',
-        description: `Endpoints **públicos** que el booking-service debe consumir en orden.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com/api/v1\`\n\n| # | Método | Ruta | Auth | Descripción |\n|---|--------|------|------|-------------|\n| 1 | POST | \`/auth/login\` | Pública | Obtener JWT |\n| 2 | GET | \`/flights/search\` | Pública | Buscar vuelos disponibles |\n| 3 | POST | \`/promotions/validate\` | Pública | Validar código de descuento |\n| 4 | POST | \`/reservations\` | Bearer JWT | Crear reserva (saga atómico) |\n| 5 | GET | \`/reservations/:id\` | Bearer JWT | Consultar reserva |\n| 6 | DELETE | \`/reservations/:id\` | Bearer JWT | Cancelar reserva |\n| 7 | POST | \`/payments\` | Bearer JWT | Registrar pago idempotente |`,
+        description: `Endpoints **públicos** que el booking-service debe consumir en orden.\n\n**Base URL:** \`https://vuelos-api-gateway-v2.onrender.com/api/v2\`\n\n| # | Método | Ruta | Auth | Descripción |\n|---|--------|------|------|-------------|\n| 1 | POST | \`/auth/login\` | Pública | Obtener JWT |\n| 2 | GET | \`/flights/search\` | Pública | Buscar vuelos disponibles |\n| 3 | POST | \`/promotions/validate\` | Pública | Validar código de descuento |\n| 4 | POST | \`/reservations\` | Bearer JWT | Crear reserva (saga atómico) |\n| 5 | GET | \`/reservations/:id\` | Bearer JWT | Consultar reserva |\n| 6 | DELETE | \`/reservations/:id\` | Bearer JWT | Cancelar reserva |\n| 7 | POST | \`/payments\` | Bearer JWT | Registrar pago idempotente |`,
       },
       {
         name: '🔐 BOOKING — Endpoints internos',
-        description: `Endpoints **servicio-a-servicio** — requieren header \`x-internal-api-key: <INTERNAL_API_KEY>\`.\n\n**Base URL:** \`https://integracion-sistemas2026.onrender.com\` (sin /api/v1)\n\n> Pide el valor de \`INTERNAL_API_KEY\` al responsable del flights-service (Juan Cevallos).\n\n| Método | Ruta | Descripción |\n|--------|------|-------------|\n| PATCH | \`/internal/flight-classes/{id}/decrement-seats\` | Reservar asientos (Body: \`{ count: N }\`) |\n| PATCH | \`/internal/flight-classes/{id}/increment-seats\` | Liberar asientos — compensación saga |\n| GET | \`/internal/promotions/by-code/{code}\` | Obtener promoción por código |\n| PATCH | \`/internal/promotions/{id}/increment-usage\` | Marcar uso de promoción |\n| PATCH | \`/internal/promotions/{id}/decrement-usage\` | Revertir uso — compensación saga |`,
+        description: `Endpoints **servicio-a-servicio** — requieren header \`x-internal-api-key: <INTERNAL_API_KEY>\`.\n\n**Base URL:** red privada Render o \`http://localhost:3003\` en desarrollo (sin /api/v2).\n\n> Pide el valor de \`INTERNAL_API_KEY\` al responsable del flights-service (Juan Cevallos).\n\n| Método | Ruta | Descripción |\n|--------|------|-------------|\n| PATCH | \`/internal/flight-classes/{id}/decrement-seats\` | Reservar asientos (Body: \`{ count: N }\`) |\n| PATCH | \`/internal/flight-classes/{id}/increment-seats\` | Liberar asientos — compensación saga |\n| GET | \`/internal/promotions/by-code/{code}\` | Obtener promoción por código |\n| PATCH | \`/internal/promotions/{id}/increment-usage\` | Marcar uso de promoción |\n| PATCH | \`/internal/promotions/{id}/decrement-usage\` | Revertir uso — compensación saga |`,
       },
       { name: 'Auth',                    description: 'Autenticación y perfil de usuario' },
       { name: 'Countries',               description: 'Países — api_countries' },

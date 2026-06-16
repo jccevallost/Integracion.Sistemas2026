@@ -5,6 +5,17 @@ import { CircuitBreaker } from '../middleware/circuitBreaker.js';
 
 const breakers = new Map<string, CircuitBreaker>();
 
+export function rewritePublicApiPath(path: string, baseUrl: string): string {
+  const upstreamPath =
+    path === '/'
+      ? baseUrl
+      : path.startsWith('/?')
+        ? `${baseUrl}${path.slice(1)}`
+        : `${baseUrl}${path}`;
+
+  return upstreamPath.replace(/^\/api\/v2(?=\/|$)/, '/api/v1');
+}
+
 export function createProxyRouter(): Router {
   const router = Router();
 
@@ -19,11 +30,14 @@ export function createProxyRouter(): Router {
       target: svc.url,
       changeOrigin: true,
       pathRewrite: (path, req) => {
-        if (path === '/') return req.baseUrl;
-        if (path.startsWith('/?')) return `${req.baseUrl}${path.slice(1)}`;
-        return `${req.baseUrl}${path}`;
+        return rewritePublicApiPath(path, req.baseUrl);
       },
       on: {
+        proxyReq: (proxyReq, req: any) => {
+          if (req.baseUrl?.startsWith('/api/v2')) {
+            proxyReq.setHeader('x-api-version', '2');
+          }
+        },
         error: (err: Error, _req: any, res: any) => {
           breaker.recordFailure();
           console.error(`[gateway] Error proxying to ${svc.name}: ${err.message}`);

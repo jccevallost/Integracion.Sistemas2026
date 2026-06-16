@@ -142,24 +142,32 @@ export const typeDefs = /* GraphQL */ `
   }
 
   type Payment {
-    id:        ID!
-    amount:    Float!
-    status:    String!
-    provider:  String!
-    createdAt: String!
+    id:            ID!
+    reservationId: ID
+    amount:        Float!
+    status:        String!
+    provider:      String!
+    transactionId: String
+    createdAt:     String!
   }
 
   type BoardingPass {
-    id:               ID!
-    boardingPassCode: String!
-    gateNumber:       String
-    boardingTime:     String
-    seatNumber:       String
+    id:            ID!
+    passengerId:   ID
+    segmentId:     ID
+    boardingCode:  String!
+    gate:          String
+    boardingGroup: String
+    checkInAt:     String
+    status:        String
   }
 
   type PassengerService {
-    id:     ID!
-    amount: Float!
-    status: String
+    id:                 ID!
+    passengerId:        ID
+    serviceConfigId:    ID
+    quantity:           Int!
+    unitPriceAtBooking: Float!
+    totalPrice:         Float!
   }
 `;

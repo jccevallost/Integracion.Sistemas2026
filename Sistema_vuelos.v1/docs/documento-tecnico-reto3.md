@@ -49,9 +49,9 @@ Componentes principales:
 
 ## 3. API Gateway e interoperabilidad
 
-El gateway mantiene los contratos REST bajo `/api/v1/*` y agrega GraphQL en
-`/graphql` para consultas compuestas. Esto permite demostrar interoperabilidad
-entre estilos:
+El gateway expone la segunda version publica bajo `/api/v2/*`, mantiene
+`/api/v1/*` como compatibilidad y agrega GraphQL en `/graphql` para consultas
+compuestas. Esto permite demostrar interoperabilidad entre estilos:
 
 - REST publico para frontend web, movil y pruebas.
 - GraphQL aggregator para reducir llamadas del cliente.
@@ -65,6 +65,9 @@ Correcciones realizadas para Reto 3:
 - Los pagos de una reserva usan `/api/v1/payments/by-reservation/:reservationId`.
 - Los boarding passes se agregan por pasajero con `/api/v1/boarding-passes/by-passenger/:passengerId`.
 - `ServiceClient` tiene timeout y propaga `x-correlation-id`.
+- Base publica objetivo v2: `https://vuelos-api-gateway-v2.onrender.com/api/v2`.
+- El proxy traduce `/api/v2/*` hacia los upstream `/api/v1/*` de cada
+  microservicio y agrega `x-api-version: 2`.
 
 ## 4. Event Bus RabbitMQ
 
@@ -121,6 +124,20 @@ La app `vuelos-mobile` cumple el entregable de frontend movil marketplace.
 El contrato publico para integrar Booking v2 queda documentado en
 `docs/contrato-api-booking-v2.md`.
 
+Artefactos de contrato versionados:
+
+- REST/OpenAPI: `contracts/rest/booking-api-v2.openapi.yaml`.
+- GraphQL: `contracts/graphql/schema-v2.graphql`.
+- Eventos RabbitMQ: `contracts/events/domain-events-v2.schema.json`.
+- gRPC: `vuelos-backend/src/grpc/proto/*.proto`.
+
+El gateway tambien publica los contratos desplegables:
+
+- `GET /api/v2/contracts`
+- `GET /contracts/rest/booking-api-v2.openapi.yaml`
+- `GET /contracts/graphql/schema-v2.graphql`
+- `GET /contracts/events/domain-events-v2.schema.json`
+
 Funciones implementadas:
 
 - Busqueda de vuelos por origen, destino, fecha, pasajeros y clase.
@@ -131,6 +148,8 @@ Funciones implementadas:
 - Detalle de reserva con pasajeros y pagos.
 - Pago de reserva por `VISA`, `MASTERCARD`, `PAYPAL` o `TRANSFER`.
 - Configuracion de API por `--dart-define=API_BASE_URL=...`.
+- Por defecto apunta al API Gateway v2:
+  `https://vuelos-api-gateway-v2.onrender.com/api/v2`.
 
 APK generado:
 
@@ -260,11 +279,15 @@ mediante `OTEL_EXPORTER_OTLP_ENDPOINT`.
 - Registrar usuario o iniciar sesion.
 - Crear reserva desde Flutter.
 - Pagar reserva desde Flutter.
-- Ver evento `reservation.created` y `payment.registered` en logs/RabbitMQ.
+- Ver eventos `ReservationCreated` y `PaymentRegistered` en logs/RabbitMQ.
 - Mostrar health del gateway y estado de circuit breakers.
 - Mostrar trazabilidad por `x-correlation-id`.
 - Explicar retry, DLQ e idempotencia del Event Bus.
 - Explicar separacion de schemas y clientes Prisma por dominio.
+- Mostrar `contracts/rest/booking-api-v2.openapi.yaml`,
+  `contracts/graphql/schema-v2.graphql` y el contrato de eventos.
+- Ejecutar `npm run smoke:v2` en `api-gateway` contra local o con
+  `GATEWAY_BASE_URL=https://vuelos-api-gateway-v2.onrender.com`.
 - Mostrar `render.yaml` raiz como evidencia de despliegue publico v2.
 - Ejecutar `npm run etl:reto3` y mostrar el reporte operacional generado.
 

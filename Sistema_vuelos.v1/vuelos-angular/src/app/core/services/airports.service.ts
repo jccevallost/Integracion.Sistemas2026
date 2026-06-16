@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 import type { Airport, ApiSuccess } from '../models/domain';
 
 const API_URL =
-  (environment as { apiUrl?: string }).apiUrl ?? 'https://integracion-sistemas2026.onrender.com/api/v1';
+  (environment as { apiUrl?: string }).apiUrl ?? 'https://vuelos-api-gateway-v2.onrender.com/api/v2';
 
 function extractData<T>(res: any): T[] {
   if (Array.isArray(res)) return res;

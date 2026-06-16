@@ -32,7 +32,7 @@ import { createFlightClassRouter, createFlightClassInternalRouter } from '../mod
 import { createSegmentRouter }                                       from '../modules/api_segments/routes/segments.routes.js';
 import { createPromotionRouter, createPromotionInternalRouter }     from '../modules/api_promotions/routes/promotions.routes.js';
 
-const PORT      = Number(process.env.FLIGHTS_SERVICE_PORT) || 3003;
+const PORT      = Number(process.env.PORT ?? process.env.FLIGHTS_SERVICE_PORT) || 3003;
 const GRPC_PORT = Number(process.env.GRPC_PORT) || 50051;
 
 validateJwtConfig();

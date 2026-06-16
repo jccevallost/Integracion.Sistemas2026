@@ -8,17 +8,26 @@ externo de booking con la version 2 del sistema de vuelos.
 Produccion actual:
 
 ```text
-https://integracion-sistemas2026.onrender.com/api/v1
+https://vuelos-api-gateway-v2.onrender.com/api/v2
 ```
 
 Despliegue v2 por API Gateway:
 
 ```text
-https://<vuelos-api-gateway-v2>.onrender.com/api/v1
+https://<vuelos-api-gateway-v2>.onrender.com/api/v2
 ```
 
 Todo cliente externo debe consumir el API Gateway. No consumir microservicios
 directamente salvo rutas internas acordadas.
+
+`/api/v2` es el contrato publico vigente. `/api/v1` se conserva como contrato
+de compatibilidad para clientes anteriores.
+
+Contrato OpenAPI fuente:
+
+```text
+contracts/rest/booking-api-v2.openapi.yaml
+```
 
 ## Formato comun
 

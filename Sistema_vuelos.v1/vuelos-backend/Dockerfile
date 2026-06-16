@@ -3,7 +3,7 @@ FROM node:20-alpine AS prisma-gen
 WORKDIR /app
 COPY package*.json ./
 COPY prisma/ ./prisma/
-RUN npm ci --omit=dev && npm run db:generate:all
+RUN npm ci && npm run db:generate:all && npm prune --omit=dev
 
 # ── Etapa 2: Compilar TypeScript ─────────────────────────────────────────────
 FROM node:20-alpine AS builder
