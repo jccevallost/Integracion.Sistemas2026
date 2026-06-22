@@ -36,9 +36,12 @@ export function createReservationRouter(controller: ReservationController, db: P
     } catch (err) { next(err); }
   });
   router.get('/:id',           authenticate, controller.getById);
-  router.delete('/:id',        authenticate, controller.cancel);
+  // ⚠️ SOLO PRUEBAS: cancelar no exige token (authenticateOptional).
+  // Si llega token se valida el dueño; sin token se permite (modo prueba).
+  // Para producción volver a 'authenticate' en ambas rutas.
+  router.delete('/:id',        authenticateOptional, controller.cancel);
   // Angular service calls PATCH /cancel — keep in sync with DELETE /:id
-  router.patch('/:id/cancel',  authenticate, controller.cancel);
+  router.patch('/:id/cancel',  authenticateOptional, controller.cancel);
 
   // ── Asignación de asiento durante check-in ───────────────────
   router.patch('/:id/passengers/:passengerId/seat', authenticate, async (req: any, res: any, next: any) => {

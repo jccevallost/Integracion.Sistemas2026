@@ -191,6 +191,9 @@ class ApiClient {
   Future<http.Response> _put(Uri uri, Object body) =>
       http.put(uri, headers: _headers, body: body).timeout(_kTimeout);
 
+  Future<http.Response> _delete(Uri uri) =>
+      http.delete(uri, headers: _headers).timeout(_kTimeout);
+
   Future<T> _decode<T>(http.Response response) async {
     late final Map<String, dynamic> body;
     try {
@@ -346,6 +349,14 @@ class ApiClient {
       }),
     );
     return Payment.fromJson(await _decode<Map<String, dynamic>>(response));
+  }
+
+  // Cancela la reserva. Usa el token de sesion ya guardado (se envia
+  // automaticamente en _headers), por lo que no pide credenciales extra.
+  Future<void> cancelReservation(String id) async {
+    await _decode<dynamic>(
+      await _delete(_uri('/reservations/$id')),
+    );
   }
 }
 
@@ -3443,6 +3454,7 @@ Future<void> showReservationDetailSheet(
 }) async {
   String provider = 'VISA';
   bool paying = false;
+  bool cancelling = false;
   late Future<ReservationDetail> detailFuture = api.reservationDetail(
     reservation.id,
   );
@@ -3504,6 +3516,52 @@ Future<void> showReservationDetailSheet(
               showMessage(context, connectionErrorMessage(err));
             } finally {
               if (context.mounted) setState(() => paying = false);
+            }
+          }
+
+          Future<void> cancel() async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Text(
+                  'Cancelar reserva',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                ),
+                content: Text(
+                  'Se cancelara la reserva ${reservation.code}. Esta accion no se puede deshacer.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Volver'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: _kRed),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Cancelar reserva'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) return;
+            setState(() => cancelling = true);
+            try {
+              await api.cancelReservation(reservation.id);
+              await onChanged();
+              if (!context.mounted) return;
+              Navigator.pop(sheetContext);
+              showMessage(context, 'Reserva cancelada');
+            } on ApiException catch (err) {
+              if (!context.mounted) return;
+              showMessage(context, err.message);
+            } catch (err) {
+              if (!context.mounted) return;
+              showMessage(context, connectionErrorMessage(err));
+            } finally {
+              if (context.mounted) setState(() => cancelling = false);
             }
           }
 
@@ -3944,6 +4002,33 @@ Future<void> showReservationDetailSheet(
                                   ],
                                 ),
                               ),
+                            if (reservation.status.toUpperCase() != 'CANCELLED' &&
+                                reservation.status.toUpperCase() !=
+                                    'CANCELADO') ...[
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: cancelling ? null : cancel,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _kRed,
+                                  side: const BorderSide(color: _kRed),
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                                icon: cancelling
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: _kRed,
+                                        ),
+                                      )
+                                    : const Icon(Icons.cancel_outlined),
+                                label: Text(
+                                  cancelling
+                                      ? 'Cancelando...'
+                                      : 'Cancelar reserva',
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),

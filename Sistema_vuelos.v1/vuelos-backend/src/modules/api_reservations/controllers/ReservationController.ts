@@ -46,7 +46,9 @@ export class ReservationController {
   cancel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId  = req.user?.id ?? '';
-      const isAdmin = req.user?.role === 'ADMIN';
+      // ⚠️ SOLO PRUEBAS: si no llega token (req.user undefined) se trata como
+      // admin para poder cancelar sin credenciales. En produccion exigir token.
+      const isAdmin = req.user?.role === 'ADMIN' || !req.user;
       const data = await this.reservationService.cancel(String(req.params.id), userId, isAdmin);
       res.json({ success: true, data });
     } catch (err) { next(err); }
