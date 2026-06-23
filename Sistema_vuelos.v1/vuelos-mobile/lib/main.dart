@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import 'admin/admin_panel.dart';
+
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://vuelos-api-gateway-v2.onrender.com/api/v2',
+  defaultValue: 'https://integracion-sistemas2026.onrender.com/api',
 );
 
 // ─── Paleta de colores ────────────────────────────────────────────────────────
@@ -841,47 +843,65 @@ class _ShellScreenState extends State<ShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = session?.role == 'ADMIN';
+
+    final screens = <Widget>[
+      SearchScreen(api: api, onReservationCreated: _onReservationCreated),
+      TripsScreen(
+        api: api,
+        isLoggedIn: session != null,
+        refreshTrigger: _refreshTrigger,
+      ),
+      AccountScreen(
+        api: api,
+        session: session,
+        onSessionChanged: (value) => setState(() => session = value),
+      ),
+      if (isAdmin)
+        AdminPanelScreen(token: api.token, userName: session?.userName),
+    ];
+
+    final destinations = <NavigationDestination>[
+      const NavigationDestination(
+        icon: Icon(Icons.flight_takeoff_outlined),
+        selectedIcon: Icon(Icons.flight_takeoff),
+        label: 'Buscar',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.confirmation_num_outlined),
+        selectedIcon: Icon(Icons.confirmation_num),
+        label: 'Mis Viajes',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Cuenta',
+      ),
+      if (isAdmin)
+        const NavigationDestination(
+          icon: Icon(Icons.admin_panel_settings_outlined),
+          selectedIcon: Icon(Icons.admin_panel_settings),
+          label: 'Admin',
+        ),
+    ];
+
+    // Evita un índice fuera de rango si el usuario admin cierra sesión
+    // mientras estaba en la pestaña Admin.
+    final safeIndex = index >= screens.length ? 0 : index;
+
     return Scaffold(
       body: IndexedStack(
-        index: index,
-        children: [
-          SearchScreen(api: api, onReservationCreated: _onReservationCreated),
-          TripsScreen(
-            api: api,
-            isLoggedIn: session != null,
-            refreshTrigger: _refreshTrigger,
-          ),
-          AccountScreen(
-            api: api,
-            session: session,
-            onSessionChanged: (value) => setState(() => session = value),
-          ),
-        ],
+        index: safeIndex,
+        children: screens,
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
         ),
         child: NavigationBar(
-          selectedIndex: index,
+          selectedIndex: safeIndex,
           onDestinationSelected: (value) => setState(() => index = value),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.flight_takeoff_outlined),
-              selectedIcon: Icon(Icons.flight_takeoff),
-              label: 'Buscar',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.confirmation_num_outlined),
-              selectedIcon: Icon(Icons.confirmation_num),
-              label: 'Mis Viajes',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Cuenta',
-            ),
-          ],
+          destinations: destinations,
         ),
       ),
     );
