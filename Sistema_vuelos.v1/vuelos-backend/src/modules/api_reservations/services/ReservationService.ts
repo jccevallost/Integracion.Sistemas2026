@@ -36,6 +36,13 @@ export class ReservationService implements IReservationService {
     if (!flightClass.hasAvailability(dto.passengers.length)) {
       throw new NoAvailabilityException(`Solo quedan ${flightClass.availableSeats} asientos disponibles`);
     }
+    if (requestedSeats.length > 0) {
+      const occupiedSeats = new Set(await this.reservationRepository.listOccupiedSeats(dto.flightClassId));
+      const occupiedSeat = requestedSeats.find((seat) => occupiedSeats.has(seat));
+      if (occupiedSeat) {
+        throw new ConflictException(`El asiento ${occupiedSeat} ya esta ocupado. Elige otro.`);
+      }
+    }
 
     const baseAmount = flightClass.calculateTotal(dto.passengers.length);
     let totalAmount  = baseAmount;

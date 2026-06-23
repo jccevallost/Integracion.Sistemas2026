@@ -80,6 +80,24 @@ export class ReservationRepository implements IReservationRepository {
     return this.db.reservation.findMany({ include: this.include, orderBy: { createdAt: 'desc' } });
   }
 
+  async listOccupiedSeats(flightClassId: string): Promise<string[]> {
+    const seats = await this.db.reservationPassenger.findMany({
+      where: {
+        flightClassId,
+        seatNumber: { not: null },
+        reservation: { status: { not: 'CANCELLED' } },
+      },
+      select: { seatNumber: true },
+      orderBy: { seatNumber: 'asc' },
+    });
+
+    return Array.from(new Set(
+      seats
+        .map((seat) => seat.seatNumber?.trim().toUpperCase())
+        .filter((seat): seat is string => Boolean(seat)),
+    ));
+  }
+
   async updateStatus(id: string, status: string): Promise<void> {
     await this.db.reservation.update({ where: { id }, data: { status: status as any } });
   }

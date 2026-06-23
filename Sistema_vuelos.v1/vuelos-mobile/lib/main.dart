@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -9,7 +8,7 @@ import 'admin/admin_panel.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://integracion-sistemas2026.onrender.com/api',
+  defaultValue: 'https://integracion-sistemas2026.onrender.com/api/v1',
 );
 
 // ─── Paleta de colores ────────────────────────────────────────────────────────
@@ -214,7 +213,10 @@ class ApiClient {
       final message = error is Map<String, dynamic>
           ? error['message']?.toString()
           : error?.toString();
-      throw ApiException(message ?? 'Error HTTP ${response.statusCode}');
+      throw ApiException(
+        message ?? 'Error HTTP ${response.statusCode}',
+        statusCode: response.statusCode,
+      );
     }
     if (body['success'] != true) {
       throw ApiException('Respuesta invalida del servidor');
@@ -260,9 +262,7 @@ class ApiClient {
   }
 
   Future<List<Flight>> featuredFlights() async {
-    final data = await _decode<List<dynamic>>(
-      await _get(_uri('/flights')),
-    );
+    final data = await _decode<List<dynamic>>(await _get(_uri('/flights')));
     return data
         .map((item) => Flight.fromJson(item as Map<String, dynamic>))
         .toList();
@@ -285,6 +285,18 @@ class ApiClient {
     return Reservation.fromJson(await _decode<Map<String, dynamic>>(response));
   }
 
+  Future<Set<String>> occupiedSeats(String flightClassId) async {
+    final data = await _decode<List<dynamic>>(
+      await _get(
+        _uri('/reservations/flight-classes/$flightClassId/occupied-seats'),
+      ),
+    );
+    return data
+        .map((item) => item.toString().trim().toUpperCase())
+        .where((seat) => seat.isNotEmpty)
+        .toSet();
+  }
+
   Future<List<Reservation>> myReservations() async {
     final data = await _decode<List<dynamic>>(
       await _get(_uri('/reservations/my')),
@@ -298,15 +310,19 @@ class ApiClient {
     final data = await _decode<Map<String, dynamic>>(
       await _get(_uri('/reservations/$id')),
     );
-    final payments = await paymentsByReservation(id);
-    return ReservationDetail.fromJson(data, payments);
+    var payments = <Payment>[];
+    String? paymentLookupError;
+    try {
+      payments = await paymentsByReservation(id);
+    } catch (err) {
+      paymentLookupError = paymentLookupErrorMessage(err);
+    }
+    return ReservationDetail.fromJson(data, payments, paymentLookupError);
   }
 
   Future<List<Payment>> paymentsByReservation(String reservationId) async {
     final data = await _decode<List<dynamic>>(
-      await _get(
-        _uri('/payments/by-reservation/$reservationId'),
-      ),
+      await _get(_uri('/payments/by-reservation/$reservationId')),
     );
     return data
         .map((item) => Payment.fromJson(item as Map<String, dynamic>))
@@ -328,12 +344,7 @@ class ApiClient {
           ? 'Sin direccion'
           : mainAddress.trim();
     }
-    await _decode<dynamic>(
-      await _put(
-        _uri('/auth/profile'),
-        jsonEncode(body),
-      ),
-    );
+    await _decode<dynamic>(await _put(_uri('/auth/profile'), jsonEncode(body)));
   }
 
   Future<Payment> payReservation(
@@ -356,17 +367,26 @@ class ApiClient {
   // Cancela la reserva. Usa el token de sesion ya guardado (se envia
   // automaticamente en _headers), por lo que no pide credenciales extra.
   Future<void> cancelReservation(String id) async {
-    await _decode<dynamic>(
-      await _delete(_uri('/reservations/$id')),
-    );
+    await _decode<dynamic>(await _delete(_uri('/reservations/$id')));
   }
 }
 
 class ApiException implements Exception {
-  ApiException(this.message);
+  ApiException(this.message, {this.statusCode});
   final String message;
+  final int? statusCode;
   @override
   String toString() => message;
+}
+
+bool isSeatAlreadyReservedError(Object error) {
+  if (error is! ApiException) return false;
+  final text = error.message.toLowerCase();
+  return error.statusCode == 409 &&
+      (text.contains('asiento') ||
+          text.contains('seat') ||
+          text.contains('ocupado') ||
+          text.contains('reservado'));
 }
 
 // ─── Modelos ──────────────────────────────────────────────────────────────────
@@ -655,29 +675,39 @@ class Reservation {
 class ReservationDetail {
   ReservationDetail({
     required this.reservation,
+    required this.flight,
     required this.passengers,
     required this.payments,
+    this.paymentLookupError,
   });
 
   final Reservation reservation;
+  final ReservationFlightSummary? flight;
   final List<ReservationPassenger> passengers;
   final List<Payment> payments;
+  final String? paymentLookupError;
 
   bool get isPaid => payments.any((p) => p.status == 'COMPLETED');
 
   factory ReservationDetail.fromJson(
     Map<String, dynamic> json,
     List<Payment> payments,
+    String? paymentLookupError,
   ) {
     final passengers = (json['passengers'] as List<dynamic>? ?? [])
         .map(
           (item) => ReservationPassenger.fromJson(item as Map<String, dynamic>),
         )
         .toList();
+    final flightJson = json['flight'];
     return ReservationDetail(
       reservation: Reservation.fromJson(json),
+      flight: flightJson is Map<String, dynamic>
+          ? ReservationFlightSummary.fromJson(flightJson)
+          : null,
       passengers: passengers,
       payments: payments,
+      paymentLookupError: paymentLookupError,
     );
   }
 }
@@ -688,6 +718,8 @@ class ReservationPassenger {
     required this.firstName,
     required this.lastName,
     required this.documentNumber,
+    this.flightClassId,
+    this.cabinClass,
     this.seatNumber,
   });
 
@@ -695,15 +727,178 @@ class ReservationPassenger {
   final String firstName;
   final String lastName;
   final String documentNumber;
+  final String? flightClassId;
+  final String? cabinClass;
   final String? seatNumber;
 
   factory ReservationPassenger.fromJson(Map<String, dynamic> json) {
+    final flightClass = asStringMap(json['flightClass']);
     return ReservationPassenger(
       id: json['id']?.toString() ?? '',
       firstName: json['firstName']?.toString() ?? '',
       lastName: json['lastName']?.toString() ?? '',
       documentNumber: json['documentNumber']?.toString() ?? '',
+      flightClassId: json['flightClassId']?.toString(),
+      cabinClass: flightClass?['cabinClass']?.toString(),
       seatNumber: json['seatNumber']?.toString(),
+    );
+  }
+}
+
+class ReservationFlightSummary {
+  ReservationFlightSummary({
+    required this.id,
+    required this.origin,
+    required this.destination,
+    required this.departureAt,
+    required this.arrivalAt,
+    required this.status,
+    required this.classes,
+    required this.segments,
+    this.airline,
+    this.durationMinutes,
+  });
+
+  final String id;
+  final String origin;
+  final String destination;
+  final String departureAt;
+  final String arrivalAt;
+  final String status;
+  final String? airline;
+  final int? durationMinutes;
+  final List<FlightClass> classes;
+  final List<ReservationFlightSegment> segments;
+
+  bool get hasData =>
+      origin.isNotEmpty ||
+      destination.isNotEmpty ||
+      departureAt.isNotEmpty ||
+      arrivalAt.isNotEmpty ||
+      segments.isNotEmpty;
+
+  String get routeLabel {
+    final from = origin.isEmpty ? '--' : origin;
+    final to = destination.isEmpty ? '--' : destination;
+    return '$from -> $to';
+  }
+
+  String? cabinClassForPassenger(ReservationPassenger passenger) {
+    if (passenger.cabinClass != null && passenger.cabinClass!.isNotEmpty) {
+      return passenger.cabinClass;
+    }
+    final id = passenger.flightClassId;
+    if (id == null || id.isEmpty) return null;
+    for (final item in classes) {
+      if (item.id == id) return item.cabinClass;
+    }
+    return null;
+  }
+
+  String? selectedCabinClass(List<ReservationPassenger> passengers) {
+    for (final passenger in passengers) {
+      final cabin = cabinClassForPassenger(passenger);
+      if (cabin != null && cabin.isNotEmpty) return cabin;
+    }
+    return classes.length == 1 ? classes.first.cabinClass : null;
+  }
+
+  factory ReservationFlightSummary.fromJson(Map<String, dynamic> json) {
+    final segments = (json['segments'] as List<dynamic>? ?? [])
+        .map(
+          (item) =>
+              ReservationFlightSegment.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+    final classes =
+        (json['flightClasses'] as List<dynamic>? ??
+                json['classes'] as List<dynamic>? ??
+                [])
+            .map((item) => FlightClass.fromJson(item as Map<String, dynamic>))
+            .toList();
+    final firstSegment = segments.isEmpty ? null : segments.first;
+    final lastSegment = segments.isEmpty ? null : segments.last;
+    final airline =
+        firstSegment?.airline ??
+        asStringMap(json['airline'])?['name']?.toString();
+
+    return ReservationFlightSummary(
+      id: json['id']?.toString() ?? '',
+      origin:
+          firstSegment?.origin ?? json['originAirportIata']?.toString() ?? '',
+      destination:
+          lastSegment?.destination ??
+          json['destinationAirportIata']?.toString() ??
+          '',
+      departureAt:
+          firstSegment?.departureAt ??
+          json['departureDateTime']?.toString() ??
+          json['departureDate']?.toString() ??
+          '',
+      arrivalAt:
+          lastSegment?.arrivalAt ?? json['arrivalDateTime']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      airline: airline,
+      durationMinutes:
+          _int(json['durationMinutes'] ?? json['duration']) ??
+          (segments.isEmpty
+              ? null
+              : segments.fold<int>(
+                  0,
+                  (sum, item) => sum + (item.durationMinutes ?? 0),
+                )),
+      classes: classes,
+      segments: segments,
+    );
+  }
+}
+
+class ReservationFlightSegment {
+  ReservationFlightSegment({
+    required this.segmentNumber,
+    required this.origin,
+    required this.destination,
+    required this.departureAt,
+    required this.arrivalAt,
+    this.airline,
+    this.durationMinutes,
+  });
+
+  final String segmentNumber;
+  final String origin;
+  final String destination;
+  final String departureAt;
+  final String arrivalAt;
+  final String? airline;
+  final int? durationMinutes;
+
+  String get routeLabel {
+    final from = origin.isEmpty ? '--' : origin;
+    final to = destination.isEmpty ? '--' : destination;
+    return '$from -> $to';
+  }
+
+  factory ReservationFlightSegment.fromJson(Map<String, dynamic> json) {
+    final originAirport = asStringMap(json['originAirport']);
+    final destinationAirport = asStringMap(json['destinationAirport']);
+    final airline = asStringMap(json['airline']);
+
+    return ReservationFlightSegment(
+      segmentNumber: json['segmentNumber']?.toString() ?? '',
+      origin:
+          airportCode(originAirport) ??
+          json['originAirportIata']?.toString() ??
+          '',
+      destination:
+          airportCode(destinationAirport) ??
+          json['destinationAirportIata']?.toString() ??
+          '',
+      departureAt: json['departureDateTime']?.toString() ?? '',
+      arrivalAt: json['arrivalDateTime']?.toString() ?? '',
+      airline: airline?['name']?.toString() ?? airline?['iataCode']?.toString(),
+      durationMinutes: _int(
+        json['estimatedDuration'] ?? json['durationMinutes'],
+      ),
     );
   }
 }
@@ -735,6 +930,18 @@ class Payment {
 }
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
+Map<String, dynamic>? asStringMap(Object? value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return null;
+}
+
+String? airportCode(Map<String, dynamic>? airport) {
+  final code = airport?['iataCode']?.toString();
+  if (code != null && code.isNotEmpty) return code;
+  return airport?['name']?.toString();
+}
+
 int? _int(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -801,6 +1008,7 @@ String _durationLabel(int? minutes) {
 Color _statusColor(String status) => switch (status.toUpperCase()) {
   'CONFIRMED' || 'COMPLETADO' || 'COMPLETED' || 'PAGADO' => _kGreen,
   'PENDING' || 'PENDIENTE' => _kOrange,
+  'PAGO NO DISP.' => _kAmber,
   'CANCELLED' || 'CANCELADO' => _kRed,
   _ => _kBlue,
 };
@@ -890,10 +1098,7 @@ class _ShellScreenState extends State<ShellScreen> {
     final safeIndex = index >= screens.length ? 0 : index;
 
     return Scaffold(
-      body: IndexedStack(
-        index: safeIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: safeIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
@@ -3195,7 +3400,12 @@ Future<void> showReservationSheet(
   final lastName = TextEditingController();
   final document = TextEditingController();
   final promotion = TextEditingController();
+  final cardNumber = TextEditingController();
+  final cardExpiry = TextEditingController();
+  final cardCvv = TextEditingController();
+  final cardHolder = TextEditingController();
   bool loading = false;
+  String provider = 'VISA';
   String? selectedSeat;
 
   await showModalBottomSheet<void>(
@@ -3205,11 +3415,33 @@ Future<void> showReservationSheet(
       return StatefulBuilder(
         builder: (context, setState) {
           Future<void> pickSeat() async {
-            final seat = await showSeatMap(context, flightClass);
+            final seat = await showSeatMap(context, api, flightClass);
             if (seat != null) setState(() => selectedSeat = seat);
           }
 
+          String? validatePayment() {
+            final raw = cardNumber.text.replaceAll(RegExp(r'\D'), '');
+            if (raw.length != 16) {
+              return 'Numero de tarjeta invalido (16 digitos)';
+            }
+            if (!_isValidExpiry(cardExpiry.text)) {
+              return 'Fecha de vencimiento invalida (MM/AA)';
+            }
+            final cvv = cardCvv.text.replaceAll(RegExp(r'\D'), '');
+            if (cvv.length < 3 || cvv.length > 4) {
+              return 'CVV invalido';
+            }
+            if (cardHolder.text.trim().isEmpty) {
+              return 'Ingresa el nombre del titular';
+            }
+            return null;
+          }
+
           Future<void> submit() async {
+            if (api.token == null) {
+              showMessage(context, 'Inicia sesion para reservar y pagar');
+              return;
+            }
             if (firstName.text.trim().isEmpty ||
                 lastName.text.trim().isEmpty ||
                 document.text.trim().isEmpty) {
@@ -3220,31 +3452,73 @@ Future<void> showReservationSheet(
               showMessage(context, 'Selecciona un asiento antes de confirmar');
               return;
             }
+            final paymentError = validatePayment();
+            if (paymentError != null) {
+              showMessage(context, paymentError);
+              return;
+            }
             setState(() => loading = true);
+            Reservation? createdReservation;
             try {
+              final occupied = await api.occupiedSeats(flightClass.id);
+              final seat = selectedSeat!.trim().toUpperCase();
+              if (occupied.contains(seat)) {
+                if (!context.mounted) return;
+                setState(() => selectedSeat = null);
+                showMessage(context, 'Asiento ya reservado: $seat');
+                return;
+              }
+              await Future<void>.delayed(const Duration(milliseconds: 700));
               final reservation = await api.createReservation(
                 flightClassId: flightClass.id,
                 passenger: PassengerInput(
                   firstName: firstName.text,
                   lastName: lastName.text,
                   documentNumber: document.text,
-                  seatNumber: selectedSeat,
+                  seatNumber: seat,
                 ),
                 promotionCode: promotion.text,
               );
+              createdReservation = reservation;
+              await api.payReservation(reservation, provider);
               if (!context.mounted || !sheetContext.mounted) return;
               Navigator.pop(sheetContext);
               showMessage(
                 context,
-                'Reserva ${reservation.code} creada · Asiento $selectedSeat',
+                'Reserva ${reservation.code} pagada - Asiento $seat',
               );
               onCreated?.call();
             } on ApiException catch (err) {
               if (!context.mounted) return;
-              showMessage(context, err.message);
+              if (createdReservation != null) {
+                try {
+                  await api.cancelReservation(createdReservation.id);
+                } catch (_) {}
+                showMessage(
+                  context,
+                  'No se pudo registrar el pago; se libero el asiento. ${err.message}',
+                );
+              } else {
+                showMessage(
+                  context,
+                  isSeatAlreadyReservedError(err)
+                      ? 'Asiento ya reservado. Elige otro.'
+                      : err.message,
+                );
+              }
             } catch (err) {
               if (!context.mounted) return;
-              showMessage(context, connectionErrorMessage(err));
+              if (createdReservation != null) {
+                try {
+                  await api.cancelReservation(createdReservation.id);
+                } catch (_) {}
+                showMessage(
+                  context,
+                  'No se pudo completar el pago; se libero el asiento.',
+                );
+              } else {
+                showMessage(context, connectionErrorMessage(err));
+              }
             } finally {
               if (context.mounted) setState(() => loading = false);
             }
@@ -3257,206 +3531,249 @@ Future<void> showReservationSheet(
               20,
               MediaQuery.of(context).viewInsets.bottom + 20,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _SheetHandle(),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.airplane_ticket_outlined,
-                        color: _kBlue,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Nueva Reserva',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                            ),
-                          ),
-                          Text(
-                            '${_cabinLabel(flightClass.cabinClass)} · \$${flightClass.basePrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.close),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Datos del pasajero',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: firstName,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre',
-                          prefixIcon: Icon(Icons.person_outline, size: 18),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _SheetHandle(),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: lastName,
-                        decoration: const InputDecoration(
-                          labelText: 'Apellido',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: document,
-                  decoration: const InputDecoration(
-                    labelText: 'Numero de documento',
-                    prefixIcon: Icon(Icons.badge_outlined, size: 18),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: promotion,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: 'Codigo promocional (opcional)',
-                    prefixIcon: Icon(Icons.local_offer_outlined, size: 18),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                // ── Selector de asiento ──────────────────────────────────────
-                GestureDetector(
-                  onTap: loading ? null : pickSeat,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selectedSeat != null
-                          ? _kGreen.withValues(alpha: 0.08)
-                          : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: selectedSeat != null
-                            ? _kGreen.withValues(alpha: 0.5)
-                            : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selectedSeat != null
-                              ? Icons.event_seat
-                              : Icons.event_seat_outlined,
-                          color: selectedSeat != null
-                              ? _kGreen
-                              : const Color(0xFF64748B),
+                        child: const Icon(
+                          Icons.airplane_ticket_outlined,
+                          color: _kBlue,
                           size: 20,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            selectedSeat != null
-                                ? 'Asiento seleccionado: $selectedSeat'
-                                : 'Seleccionar asiento (obligatorio)',
-                            style: TextStyle(
-                              color: selectedSeat != null
-                                  ? _kGreen
-                                  : const Color(0xFF64748B),
-                              fontWeight: selectedSeat != null
-                                  ? FontWeight.w700
-                                  : FontWeight.normal,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Nueva Reserva',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                              ),
                             ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          color: selectedSeat != null
-                              ? _kGreen
-                              : Colors.grey.shade400,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total a pagar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
+                            Text(
+                              '${_cabinLabel(flightClass.cabinClass)} · \$${flightClass.basePrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        '\$${flightClass.basePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _kBlue,
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFF1F5F9),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: loading ? null : submit,
-                  icon: loading
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Datos del pasajero',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: firstName,
+                          decoration: const InputDecoration(
+                            labelText: 'Nombre',
+                            prefixIcon: Icon(Icons.person_outline, size: 18),
                           ),
-                        )
-                      : const Icon(Icons.check_circle_outline),
-                  label: Text(loading ? 'Procesando...' : 'Confirmar reserva'),
-                ),
-              ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: lastName,
+                          decoration: const InputDecoration(
+                            labelText: 'Apellido',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: document,
+                    decoration: const InputDecoration(
+                      labelText: 'Numero de documento',
+                      prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: promotion,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Codigo promocional (opcional)',
+                      prefixIcon: Icon(Icons.local_offer_outlined, size: 18),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // ── Selector de asiento ──────────────────────────────────────
+                  GestureDetector(
+                    onTap: loading ? null : pickSeat,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selectedSeat != null
+                            ? _kGreen.withValues(alpha: 0.08)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selectedSeat != null
+                              ? _kGreen.withValues(alpha: 0.5)
+                              : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selectedSeat != null
+                                ? Icons.event_seat
+                                : Icons.event_seat_outlined,
+                            color: selectedSeat != null
+                                ? _kGreen
+                                : const Color(0xFF64748B),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              selectedSeat != null
+                                  ? 'Asiento seleccionado: $selectedSeat'
+                                  : 'Seleccionar asiento (obligatorio)',
+                              style: TextStyle(
+                                color: selectedSeat != null
+                                    ? _kGreen
+                                    : const Color(0xFF64748B),
+                                fontWeight: selectedSeat != null
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: selectedSeat != null
+                                ? _kGreen
+                                : Colors.grey.shade400,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Pasarela de pago',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: provider,
+                    decoration: const InputDecoration(
+                      labelText: 'Metodo de pago',
+                      prefixIcon: Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 18,
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'VISA', child: Text('Visa')),
+                      DropdownMenuItem(
+                        value: 'MASTERCARD',
+                        child: Text('Mastercard'),
+                      ),
+                    ],
+                    onChanged: loading
+                        ? null
+                        : (value) => setState(() => provider = value ?? 'VISA'),
+                  ),
+                  const SizedBox(height: 12),
+                  _CardForm(
+                    brand: provider,
+                    cardNumber: cardNumber,
+                    expiry: cardExpiry,
+                    cvv: cardCvv,
+                    holder: cardHolder,
+                    enabled: !loading,
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total a pagar',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        Text(
+                          '\$${flightClass.basePrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _kBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: loading ? null : submit,
+                    icon: loading
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_circle_outline),
+                    label: Text(
+                      loading ? 'Procesando...' : 'Confirmar y pagar',
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -3501,7 +3818,7 @@ Future<void> showReservationDetailSheet(
                 showMessage(context, 'Numero de tarjeta invalido (16 digitos)');
                 return;
               }
-              if (cardExpiry.text.length < 5) {
+              if (!_isValidExpiry(cardExpiry.text)) {
                 showMessage(context, 'Fecha de vencimiento invalida (MM/AA)');
                 return;
               }
@@ -3591,6 +3908,7 @@ Future<void> showReservationDetailSheet(
               future: detailFuture,
               builder: (context, snapshot) {
                 final detail = snapshot.data;
+                final displayReservation = detail?.reservation ?? reservation;
                 return Column(
                   children: [
                     // Fixed header
@@ -3606,7 +3924,7 @@ Future<void> showReservationDetailSheet(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      reservation.code,
+                                      displayReservation.code,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 20,
@@ -3615,13 +3933,15 @@ Future<void> showReservationDetailSheet(
                                     ),
                                     Row(
                                       children: [
-                                        _StatusBadge(reservation.status),
+                                        _StatusBadge(displayReservation.status),
                                         const SizedBox(width: 8),
                                         if (detail != null)
                                           _StatusBadge(
-                                            detail.isPaid
-                                                ? 'PAGADO'
-                                                : 'PENDIENTE PAGO',
+                                            detail.paymentLookupError != null
+                                                ? 'PAGO NO DISP.'
+                                                : (detail.isPaid
+                                                      ? 'PAGADO'
+                                                      : 'PENDIENTE PAGO'),
                                           ),
                                       ],
                                     ),
@@ -3655,7 +3975,9 @@ Future<void> showReservationDetailSheet(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      formatDateTime(reservation.createdAt),
+                                      formatDateTime(
+                                        displayReservation.createdAt,
+                                      ),
                                       style: TextStyle(
                                         color: Colors.white.withValues(
                                           alpha: 0.65,
@@ -3685,7 +4007,7 @@ Future<void> showReservationDetailSheet(
                                       ),
                                     ),
                                     Text(
-                                      '\$${reservation.total.toStringAsFixed(2)}',
+                                      '\$${displayReservation.total.toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 22,
@@ -3727,6 +4049,21 @@ Future<void> showReservationDetailSheet(
                             ),
                           if (detail != null) ...[
                             const SizedBox(height: 8),
+                            if (detail.flight != null &&
+                                detail.flight!.hasData) ...[
+                              _SectionTitle(
+                                icon: Icons.flight_takeoff,
+                                title: 'Vuelo',
+                              ),
+                              const SizedBox(height: 8),
+                              _FlightSummaryCard(
+                                flight: detail.flight!,
+                                cabinClass: detail.flight!.selectedCabinClass(
+                                  detail.passengers,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             _SectionTitle(
                               icon: Icons.people_outline,
                               title: 'Pasajeros',
@@ -3821,7 +4158,12 @@ Future<void> showReservationDetailSheet(
                               title: 'Historial de pagos',
                             ),
                             const SizedBox(height: 8),
-                            if (detail.payments.isEmpty)
+                            if (detail.paymentLookupError != null)
+                              _InlineWarning(
+                                title: 'Pagos no disponibles',
+                                text: detail.paymentLookupError!,
+                              )
+                            else if (detail.payments.isEmpty)
                               const Text(
                                 'Aun no hay pagos para esta reserva.',
                                 style: TextStyle(color: Color(0xFF94A3B8)),
@@ -3990,7 +4332,7 @@ Future<void> showReservationDetailSheet(
                                 label: Text(
                                   paying
                                       ? 'Procesando...'
-                                      : 'Pagar \$${reservation.total.toStringAsFixed(2)}',
+                                      : 'Pagar \$${displayReservation.total.toStringAsFixed(2)}',
                                 ),
                               ),
                             ] else
@@ -4022,8 +4364,9 @@ Future<void> showReservationDetailSheet(
                                   ],
                                 ),
                               ),
-                            if (reservation.status.toUpperCase() != 'CANCELLED' &&
-                                reservation.status.toUpperCase() !=
+                            if (displayReservation.status.toUpperCase() !=
+                                    'CANCELLED' &&
+                                displayReservation.status.toUpperCase() !=
                                     'CANCELADO') ...[
                               const SizedBox(height: 12),
                               OutlinedButton.icon(
@@ -4062,6 +4405,224 @@ Future<void> showReservationDetailSheet(
       );
     },
   );
+}
+
+class _FlightSummaryCard extends StatelessWidget {
+  const _FlightSummaryCard({required this.flight, required this.cabinClass});
+
+  final ReservationFlightSummary flight;
+  final String? cabinClass;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = _durationLabel(flight.durationMinutes);
+    final airline = flight.airline;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: const Border.fromBorderSide(
+          BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.flight, size: 18, color: _kBlue),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  flight.routeLabel,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _kNavy,
+                  ),
+                ),
+              ),
+              if (flight.status.isNotEmpty) _StatusBadge(flight.status),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _TicketInfoRow(
+            icon: Icons.schedule_outlined,
+            label: 'Salida',
+            value: formatDateTime(flight.departureAt),
+          ),
+          const SizedBox(height: 8),
+          _TicketInfoRow(
+            icon: Icons.flag_outlined,
+            label: 'Llegada',
+            value: formatDateTime(flight.arrivalAt),
+          ),
+          if (airline != null && airline.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _TicketInfoRow(
+              icon: Icons.airlines_outlined,
+              label: 'Aerolinea',
+              value: airline,
+            ),
+          ],
+          if (cabinClass != null && cabinClass!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _TicketInfoRow(
+              icon: Icons.airline_seat_recline_normal_outlined,
+              label: 'Clase',
+              value: _cabinLabel(cabinClass!),
+            ),
+          ],
+          if (duration.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _TicketInfoRow(
+              icon: Icons.timer_outlined,
+              label: 'Duracion',
+              value: duration,
+            ),
+          ],
+          if (flight.segments.length > 1) ...[
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 10),
+            const Text(
+              'Tramos',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...flight.segments.map(
+              (segment) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        segment.routeLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Text(
+                      formatDateTime(segment.departureAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TicketInfoRow extends StatelessWidget {
+  const _TicketInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 78,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineWarning extends StatelessWidget {
+  const _InlineWarning({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _kAmber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kAmber.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: _kAmber, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF92400E),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Color(0xFF92400E),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -4109,6 +4670,16 @@ String connectionErrorMessage(Object error) {
   return 'No se pudo conectar con la API. Revisa Internet o espera a que Render termine de iniciar.';
 }
 
+String paymentLookupErrorMessage(Object error) {
+  if (error is ApiException) {
+    return 'No se pudo consultar pagos: ${error.message}';
+  }
+  if (error is TimeoutException) {
+    return 'No se pudo consultar pagos: la solicitud tardo demasiado.';
+  }
+  return 'No se pudo consultar pagos.';
+}
+
 String formatDateTime(String value) {
   if (value.isEmpty) return '--';
   final parsed = DateTime.tryParse(value);
@@ -4122,6 +4693,18 @@ String formatDateTime(String value) {
 }
 
 // ─── Credit Card Form ─────────────────────────────────────────────────────────
+bool _isValidExpiry(String value) {
+  final match = RegExp(r'^(\d{2})/(\d{2})$').firstMatch(value.trim());
+  if (match == null) return false;
+  final month = int.tryParse(match.group(1)!);
+  final year = int.tryParse(match.group(2)!);
+  if (month == null || year == null || month < 1 || month > 12) return false;
+  final now = DateTime.now();
+  final fullYear = 2000 + year;
+  final lastDayOfMonth = DateTime(fullYear, month + 1, 0);
+  return !lastDayOfMonth.isBefore(DateTime(now.year, now.month, 1));
+}
+
 class _CardForm extends StatefulWidget {
   const _CardForm({
     required this.brand,
@@ -4409,16 +4992,21 @@ class _ExpiryFormatter extends TextInputFormatter {
 }
 
 // ─── Seat Map ─────────────────────────────────────────────────────────────────
-Future<String?> showSeatMap(BuildContext context, FlightClass flightClass) {
+Future<String?> showSeatMap(
+  BuildContext context,
+  ApiClient api,
+  FlightClass flightClass,
+) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => _SeatMapSheet(flightClass: flightClass),
+    builder: (_) => _SeatMapSheet(api: api, flightClass: flightClass),
   );
 }
 
 class _SeatMapSheet extends StatefulWidget {
-  const _SeatMapSheet({required this.flightClass});
+  const _SeatMapSheet({required this.api, required this.flightClass});
+  final ApiClient api;
   final FlightClass flightClass;
 
   @override
@@ -4427,7 +5015,11 @@ class _SeatMapSheet extends StatefulWidget {
 
 class _SeatMapSheetState extends State<_SeatMapSheet> {
   String? _selected;
-  late final Set<String> _taken;
+  Set<String> _taken = {};
+  bool _loadingTaken = true;
+  bool _refreshingTaken = false;
+  String? _takenError;
+  Timer? _refreshTimer;
   late final List<String> _cols;
   late final int _rows;
 
@@ -4445,31 +5037,65 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
       _rows = 30;
       _cols = ['A', 'B', 'C', 'D', 'E', 'F'];
     }
-    final totalSeats = _rows * _cols.length;
-    _taken = _computeTakenSeats(
-      seed: widget.flightClass.id.hashCode.abs(),
-      total: totalSeats,
-      available: widget.flightClass.availableSeats.clamp(0, totalSeats),
-      rows: _rows,
-      cols: _cols,
-    );
+    _taken = _allSeatLabels().toSet();
+    _loadTakenSeats();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && !_loadingTaken) {
+        _loadTakenSeats(silent: true);
+      }
+    });
   }
 
-  static Set<String> _computeTakenSeats({
-    required int seed,
-    required int total,
-    required int available,
-    required int rows,
-    required List<String> cols,
-  }) {
-    final takenCount = (total - available).clamp(0, total);
-    if (takenCount == 0) return {};
-    final all = <String>[
-      for (int r = 1; r <= rows; r++)
-        for (final c in cols) '$r$c',
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  List<String> _allSeatLabels() {
+    return [
+      for (int r = 1; r <= _rows; r++)
+        for (final c in _cols) '$r$c',
     ];
-    all.shuffle(math.Random(seed));
-    return all.take(takenCount).toSet();
+  }
+
+  Future<void> _loadTakenSeats({bool silent = false}) async {
+    if (_refreshingTaken) return;
+    _refreshingTaken = true;
+    if (!silent) {
+      setState(() {
+        _loadingTaken = true;
+        _takenError = null;
+        _selected = null;
+        _taken = _allSeatLabels().toSet();
+      });
+    }
+    try {
+      final seats = await widget.api.occupiedSeats(widget.flightClass.id);
+      if (!mounted) return;
+      final selectedSeat = _selected;
+      final selectedWasTaken =
+          selectedSeat != null && seats.contains(selectedSeat);
+      setState(() {
+        _taken = seats;
+        _loadingTaken = false;
+        _takenError = null;
+        if (selectedWasTaken) _selected = null;
+      });
+      if (selectedWasTaken) {
+        showMessage(context, 'Asiento ya reservado: $selectedSeat');
+      }
+    } catch (err) {
+      if (!mounted) return;
+      if (silent) return;
+      setState(() {
+        _loadingTaken = false;
+        _takenError = connectionErrorMessage(err);
+        _taken = _allSeatLabels().toSet();
+      });
+    } finally {
+      _refreshingTaken = false;
+    }
   }
 
   @override
@@ -4518,7 +5144,11 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                             ),
                           ),
                           Text(
-                            '${_cabinLabel(widget.flightClass.cabinClass)} · ${widget.flightClass.availableSeats} disponibles',
+                            _loadingTaken
+                                ? '${_cabinLabel(widget.flightClass.cabinClass)} - consultando ocupacion'
+                                : _takenError != null
+                                ? '${_cabinLabel(widget.flightClass.cabinClass)} - ocupacion no disponible'
+                                : '${_cabinLabel(widget.flightClass.cabinClass)} - ${_taken.length} ocupados reales',
                             style: const TextStyle(
                               color: Color(0xFF64748B),
                               fontSize: 13,
@@ -4555,6 +5185,42 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                if (_takenError != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _kRed.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _kRed.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.warning_amber_outlined,
+                          color: _kRed,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'No se pudo consultar la ocupacion real.',
+                            style: TextStyle(
+                              color: _kRed,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _loadTakenSeats,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ],
             ),
           ),
@@ -4649,12 +5315,19 @@ class _SeatMapSheetState extends State<_SeatMapSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _selected == null
+                    onPressed:
+                        _selected == null ||
+                            _loadingTaken ||
+                            _takenError != null
                         ? null
                         : () => Navigator.pop(context, _selected),
                     icon: const Icon(Icons.check_circle_outline),
                     label: Text(
-                      _selected == null
+                      _loadingTaken
+                          ? 'Consultando asientos...'
+                          : _takenError != null
+                          ? 'Ocupacion no disponible'
+                          : _selected == null
                           ? 'Selecciona un asiento'
                           : 'Confirmar asiento $_selected',
                     ),
@@ -4698,7 +5371,9 @@ class _SeatButton extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: isTaken ? null : onTap,
+      onTap: isTaken
+          ? () => showMessage(context, 'Asiento ya reservado: $label')
+          : onTap,
       child: Container(
         width: 34,
         height: 30,

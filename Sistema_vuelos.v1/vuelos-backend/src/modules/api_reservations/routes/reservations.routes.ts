@@ -29,9 +29,15 @@ export function createReservationRouter(controller: ReservationController, db: P
         orderBy: { seatNumber: 'asc' },
       });
 
+      const occupiedSeats = Array.from(new Set(
+        seats
+          .map((seat) => seat.seatNumber?.trim().toUpperCase())
+          .filter((seat): seat is string => Boolean(seat)),
+      ));
+
       res.json({
         success: true,
-        data: seats.map((seat) => seat.seatNumber).filter(Boolean),
+        data: occupiedSeats,
       });
     } catch (err) { next(err); }
   });

@@ -6,6 +6,7 @@ export interface IReservationRepository extends IBaseRepository<Reservation> {
   findByUserId(userId: string): Promise<any[]>;
   findByIdWithRelations(id: string): Promise<any | null>;
   findAllWithRelations(): Promise<any[]>;
+  listOccupiedSeats(flightClassId: string): Promise<string[]>;
   updateStatus(id: string, status: string): Promise<void>;
   /** Cancels reservation and clears seat numbers. Seat/promo restoration happens via HTTP in ReservationService. */
   cancelAndRestoreSeats(id: string): Promise<void>;

@@ -4,7 +4,8 @@
       "Bash(git commit -m ' *)",
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Asus_G16\\\\Documents\\\\Integracion Sistemas\\\\Sistema_vuelos.v1\\\\vuelos-mobile\" -Recurse | Where-Object {$_.Extension -eq \".yaml\" -or $_.Extension -eq \".yml\" -or $_.Extension -eq \".json\"} | Select-Object -ExpandProperty FullName)",
       "Bash(dart analyze *)",
-      "Bash(flutter build *)"
+      "Bash(flutter build *)",
+      "Bash(flutter analyze *)"
     ]
   }
 }
