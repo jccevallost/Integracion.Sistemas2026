@@ -4,7 +4,7 @@ import { tap } from 'rxjs';
 import { AuthStore } from '../store/auth.store';
 import type { ApiSuccess, AuthResponse, LoginCredentials, RegisterData, User } from '../models/domain';
 
-const BASE = 'https://vuelos-api-gateway-v2.onrender.com/api/v2';
+const BASE = 'https://integracion-sistemas2026.onrender.com/api';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {

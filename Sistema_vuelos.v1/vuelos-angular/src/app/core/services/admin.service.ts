@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AuthStore } from '../store/auth.store';
 
-const API_URL = 'https://vuelos-api-gateway-v2.onrender.com/api/v2';
+const API_URL = 'https://integracion-sistemas2026.onrender.com/api';
 
 function extractData(res: any): any[] {
   if (res?.data?.data) return res.data.data;
